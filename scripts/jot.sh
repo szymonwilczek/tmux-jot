@@ -84,14 +84,15 @@ load_context_and_config() {
     local out
     local format
 
-    format="#{client_name}${SEP}#{session_name}${SEP}#{@jot-hidden-session-prefix}${SEP}#{@jot-debug}${SEP}#{@jot-log-file}${SEP}#{@jot-dir}${SEP}#{@jot-extension}${SEP}#{@jot-session-dir}${SEP}#{@jot-editor}${SEP}#{@jot-shell}${SEP}#{@jot-fzf-command}${SEP}#{@jot-fzf-options}${SEP}#{@jot-sort-notes}${SEP}#{@jot-border-color}${SEP}#{@jot-border-style}${SEP}#{@jot-popup-width}${SEP}#{@jot-popup-height}${SEP}#{@jot-popup-x}${SEP}#{@jot-popup-y}${SEP}#{@jot-title-icon}${SEP}#{@jot-title}${SEP}#{@jot-fzf-prompt}"
+    format="#{client_name}${SEP}#{session_name}${SEP}#{@jot-hidden-session-prefix}${SEP}#{@jot-debug}${SEP}#{@jot-log-file}${SEP}#{@jot-dir}${SEP}#{@jot-extension}${SEP}#{@jot-session-dir}${SEP}#{@jot-editor}${SEP}#{@jot-shell}${SEP}#{@jot-fzf-command}${SEP}#{@jot-fzf-options}${SEP}#{@jot-sort-notes}${SEP}#{@jot-rg-command}${SEP}#{@jot-content-search-prompt}${SEP}#{@jot-content-search-preview-window}${SEP}#{@jot-border-color}${SEP}#{@jot-border-style}${SEP}#{@jot-popup-width}${SEP}#{@jot-popup-height}${SEP}#{@jot-popup-x}${SEP}#{@jot-popup-y}${SEP}#{@jot-title-icon}${SEP}#{@jot-title}${SEP}#{@jot-fzf-prompt}"
     out="$(tmux display-message -p "$format" 2>/dev/null || true)"
 
     IFS="$SEP" read -r \
         TMUX_CLIENT TMUX_SESSION CFG_HIDDEN_PREFIX CFG_DEBUG CFG_LOG_FILE \
         CFG_JOT_DIR CFG_EXT CFG_SESSION_DIR CFG_EDITOR CFG_SHELL \
-        CFG_FZF_COMMAND CFG_FZF_OPTIONS CFG_SORT_NOTES CFG_BORDER_COLOR \
-        CFG_BORDER_STYLE CFG_POPUP_WIDTH CFG_POPUP_HEIGHT CFG_POPUP_X CFG_POPUP_Y \
+        CFG_FZF_COMMAND CFG_FZF_OPTIONS CFG_SORT_NOTES CFG_RG_COMMAND \
+        CFG_CONTENT_SEARCH_PROMPT CFG_CONTENT_SEARCH_PREVIEW_WINDOW \
+        CFG_BORDER_COLOR CFG_BORDER_STYLE CFG_POPUP_WIDTH CFG_POPUP_HEIGHT CFG_POPUP_X CFG_POPUP_Y \
         CFG_ICON CFG_TITLE CFG_FZF_PROMPT <<<"$out"
 
     CURRENT_CLIENT="${RAW_SOURCE_CLIENT:-$TMUX_CLIENT}"
@@ -113,6 +114,8 @@ load_context_and_config() {
     FZF_COMMAND="${CFG_FZF_COMMAND:-fzf}"
     FZF_OPTIONS="${CFG_FZF_OPTIONS:-}"
     SORT_NOTES="${CFG_SORT_NOTES:-off}"
+    RG_COMMAND="${CFG_RG_COMMAND:-rg}"
+    CONTENT_SEARCH_PREVIEW_WINDOW="${CFG_CONTENT_SEARCH_PREVIEW_WINDOW:-right,60%,border-left}"
 
     BORDER_COLOR="${CFG_BORDER_COLOR:-#b38d59}"
     BORDER_STYLE="${CFG_BORDER_STYLE:-rounded}"
@@ -131,6 +134,11 @@ load_context_and_config() {
         FZF_PROMPT_TEMPLATE="$CFG_FZF_PROMPT"
     else
         FZF_PROMPT_TEMPLATE='{icon} Wybierz / Utwórz: '
+    fi
+    if [ -n "$CFG_CONTENT_SEARCH_PROMPT" ]; then
+        CONTENT_SEARCH_PROMPT_TEMPLATE="$CFG_CONTENT_SEARCH_PROMPT"
+    else
+        CONTENT_SEARCH_PROMPT_TEMPLATE='{icon} Szukaj w treści: '
     fi
 
     if [ "$POS_X" = "R" ] || [ "$POS_X" = "r" ]; then
@@ -544,6 +552,10 @@ fzf_prompt() {
     render_template "$FZF_PROMPT_TEMPLATE"
 }
 
+content_search_prompt() {
+    render_template "$CONTENT_SEARCH_PROMPT_TEMPLATE"
+}
+
 popup_editor_command() {
     shell_join "$SCRIPT_PATH" popup_editor "$SOURCE_CLIENT" "$SESSION_NAME" "$POPUP_SESSION"
 }
@@ -552,6 +564,13 @@ display_picker_popup() {
     local command
 
     command="$(shell_join "$SCRIPT_PATH" popup_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
+    display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$command"
+}
+
+display_content_search_popup() {
+    local command
+
+    command="$(shell_join "$SCRIPT_PATH" popup_content_search "$SOURCE_CLIENT" "$SESSION_NAME")"
     display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$command"
 }
 
@@ -564,6 +583,14 @@ schedule_picker_popup() {
 
     command="$(shell_join "$SCRIPT_PATH" open_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
     debug_log "Scheduling async picker open: $command"
+    tmux run-shell -b "$command"
+}
+
+schedule_content_search_popup() {
+    local command
+
+    command="$(shell_join "$SCRIPT_PATH" open_content_search "$SOURCE_CLIENT" "$SESSION_NAME")"
+    debug_log "Scheduling async content search open: $command"
     tmux run-shell -b "$command"
 }
 
@@ -646,6 +673,49 @@ run_fzf() {
     "$COMMAND_SHELL" -c "$script"
 }
 
+rg_binary() {
+    local command="$RG_COMMAND"
+
+    command="${command%% *}"
+    printf '%s' "$command"
+}
+
+run_content_fzf() {
+    local rg_bin
+    local dir_quoted
+    local glob_quoted
+    local prompt_quoted
+    local preview_window_quoted
+    local reload_command
+    local preview_command
+    local start_bind_quoted
+    local change_bind_quoted
+    local preview_command_quoted
+    local script
+
+    rg_bin="$(rg_binary)"
+    if ! command -v "$rg_bin" >/dev/null 2>&1; then
+        message_client "ripgrep not found: $rg_bin"
+        debug_log "content search failed: rg command not found: $rg_bin"
+        exit 1
+    fi
+
+    printf -v dir_quoted '%q' "$JOT_DIR"
+    printf -v glob_quoted '%q' "*.$EXT"
+    printf -v prompt_quoted '%q' "$(content_search_prompt)"
+    printf -v preview_window_quoted '%q' "$CONTENT_SEARCH_PREVIEW_WINDOW"
+
+    reload_command="[ -n {q} ] && $RG_COMMAND --line-number --column --no-heading --color=always --colors path:none --colors line:none --colors column:none --smart-case --glob $glob_quoted -- {q} $dir_quoted 2>/dev/null || true"
+    preview_command="[ -n {q} ] && $RG_COMMAND --line-number --color=always --context 3 --smart-case -- {q} {1} 2>/dev/null || sed -n '1,120p' {1} 2>/dev/null"
+
+    printf -v start_bind_quoted '%q' "start:reload:$reload_command"
+    printf -v change_bind_quoted '%q' "change:reload:$reload_command"
+    printf -v preview_command_quoted '%q' "$preview_command"
+
+    script="exec $FZF_COMMAND $FZF_OPTIONS --ansi --disabled --delimiter=: --nth=4.. --prompt=$prompt_quoted --print-query --expect=enter --bind=$start_bind_quoted --bind=$change_bind_quoted --preview=$preview_command_quoted --preview-window=$preview_window_quoted"
+    "$COMMAND_SHELL" -c "$script"
+}
+
 select_note() {
     local fzf_out
     local fzf_status
@@ -711,9 +781,66 @@ prepare_selected_note() {
     debug_log "selected note: session=$SESSION_NAME file=$FILE_PATH link=$SESSION_LINK"
 }
 
+select_content_match() {
+    local fzf_out
+    local fzf_status
+    local line
+    local line_no=0
+    local query=""
+    local selection=""
+    local target_file
+
+    fzf_out="$(run_content_fzf)"
+    fzf_status=$?
+
+    if [ "$fzf_status" -ne 0 ] || [ -z "$fzf_out" ]; then
+        debug_log "content search cancelled: status=$fzf_status session=$SESSION_NAME"
+        exit 0
+    fi
+
+    while IFS= read -r line; do
+        line_no=$((line_no + 1))
+        case "$line_no" in
+        1) query="$(trim_space "$line")" ;;
+        3)
+            selection="$line"
+            break
+            ;;
+        esac
+    done <<<"$fzf_out"
+
+    if [ -z "$selection" ]; then
+        debug_log "content search empty selection: query=$query session=$SESSION_NAME"
+        exit 0
+    fi
+
+    target_file="${selection%%:*}"
+    if ! has_note_file "$target_file"; then
+        message_client "selected search result is missing"
+        debug_log "content search missing file: selected=$selection target=$target_file session=$SESSION_NAME"
+        exit 1
+    fi
+
+    set_note_context_from_file "$target_file"
+    debug_log "content search selected: query=$query session=$SESSION_NAME file=$FILE_PATH note=$NOTE_NAME"
+}
+
+link_selected_note() {
+    if ! ln -sfn "$FILE_PATH" "$SESSION_LINK" 2>/dev/null; then
+        message_client "cannot link session note: $SESSION_LINK -> $FILE_PATH"
+        debug_log "link failed: source=$FILE_PATH target=$SESSION_LINK session=$SESSION_NAME"
+        exit 1
+    fi
+}
+
 open_picker() {
     resolve_note_context
     display_picker_popup
+}
+
+open_content_search() {
+    resolve_note_context
+    display_content_search_popup
 }
 
 open_editor() {
@@ -778,8 +905,18 @@ switch | search)
     schedule_picker_popup
     ;;
 
+content_search)
+    close_popup "$SOURCE_CLIENT"
+    clear_popup_state
+    schedule_content_search_popup
+    ;;
+
 open_picker)
     open_picker
+    ;;
+
+open_content_search)
+    open_content_search
     ;;
 
 open_editor)
@@ -791,6 +928,14 @@ popup_picker)
     begin_popup_lifecycle "picker"
     select_note
     prepare_selected_note
+    schedule_editor_popup "$FILE_PATH" "$NOTE_NAME"
+    ;;
+
+popup_content_search)
+    resolve_note_context
+    begin_popup_lifecycle "content_search"
+    select_content_match
+    link_selected_note
     schedule_editor_popup "$FILE_PATH" "$NOTE_NAME"
     ;;
 
