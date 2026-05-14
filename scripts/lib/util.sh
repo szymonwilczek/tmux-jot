@@ -98,30 +98,6 @@ message_client() {
     fi
 }
 
-has_note_file() {
-    [ -n "${1:-}" ] && [ -e "$1" ]
-}
-
-note_name_is_valid() {
-    local name="$1"
-
-    [ -n "$name" ] || return 1
-    [[ "$name" != *"/"* ]] || return 1
-    [[ "$name" != *$'\n'* ]] || return 1
-    [[ "$name" != *$'\r'* ]] || return 1
-    return 0
-}
-
-render_template() {
-    local template="$1"
-
-    template="${template//\{icon\}/$ICON}"
-    template="${template//\{session\}/$SESSION_NAME}"
-    template="${template//\{note\}/${NOTE_NAME:-$SESSION_NAME}}"
-    template="${template//\{file\}/$FILE_PATH}"
-    printf '%s' "$template"
-}
-
 command_binary() {
     local command="$RG_COMMAND"
 
@@ -130,10 +106,4 @@ command_binary() {
     fi
     command="${command%% *}"
     printf '%s' "$command"
-}
-
-wait_for_key() {
-    printf '\nPress any key to close...'
-    IFS= read -r -n 1 REPLY || true
-    printf '\n'
 }

@@ -1,3 +1,17 @@
+has_note_file() {
+    [ -n "${1:-}" ] && [ -e "$1" ]
+}
+
+note_name_is_valid() {
+    local name="$1"
+
+    [ -n "$name" ] || return 1
+    [[ "$name" != *"/"* ]] || return 1
+    [[ "$name" != *$'\n'* ]] || return 1
+    [[ "$name" != *$'\r'* ]] || return 1
+    return 0
+}
+
 ensure_storage() {
     [ "${STORAGE_READY:-0}" = "1" ] && return 0
 
@@ -59,42 +73,6 @@ resolve_note_context() {
         POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_NOTE_NAME}"
     else
         POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_SESSION}_picker"
-    fi
-}
-
-resolve_origin_session() {
-    local stored_origin
-    local parent_session
-
-    if [ -n "$CURRENT_SESSION" ]; then
-        if [[ "$CURRENT_SESSION" != "$HIDDEN_PREFIX"* ]]; then
-            tmux set-option -gq "@jot_origin_$SAFE_CLIENT" "$CURRENT_SESSION" 2>/dev/null || true
-            if [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; then
-                SESSION_NAME="$CURRENT_SESSION"
-            fi
-        else
-            stored_origin="$(tmux show-option -gqv "@jot_origin_$SAFE_CLIENT" 2>/dev/null || true)"
-            if [ -n "$stored_origin" ]; then
-                if [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; then
-                    SESSION_NAME="$stored_origin"
-                fi
-            else
-                parent_session="$(tmux display-message -p '#{client_last_session}' 2>/dev/null || true)"
-                if [ -n "$parent_session" ] && { [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; }; then
-                    SESSION_NAME="$parent_session"
-                fi
-            fi
-        fi
-    else
-        stored_origin="$(tmux show-option -gqv "@jot_origin_$SAFE_CLIENT" 2>/dev/null || true)"
-        if [ -n "$stored_origin" ] && { [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; }; then
-            SESSION_NAME="$stored_origin"
-        fi
-    fi
-
-    if [ -z "$SESSION_NAME" ]; then
-        message_client "cannot resolve source session"
-        exit 1
     fi
 }
 
