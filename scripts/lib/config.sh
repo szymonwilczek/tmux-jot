@@ -39,6 +39,8 @@ load_context_and_config() {
     BORDER_STYLE="${CFG_BORDER_STYLE:-rounded}"
     WIDTH="${CFG_POPUP_WIDTH:-40%}"
     HEIGHT="${CFG_POPUP_HEIGHT:-50%}"
+    POPUP_WIDTH_BASE="$WIDTH"
+    POPUP_HEIGHT_BASE="$HEIGHT"
     POS_X="${CFG_POPUP_X:-100%}"
     POS_Y="${CFG_POPUP_Y:-0}"
 

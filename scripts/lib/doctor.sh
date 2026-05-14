@@ -40,17 +40,6 @@ doctor_hidden_sessions() {
     fi
 }
 
-popup_state_kind() {
-    local state="$1"
-    local rest
-
-    [ -n "$state" ] || return 1
-    [[ "$state" == *"|"* ]] || return 1
-
-    rest="${state#*|}"
-    printf '%s' "${rest%%|*}"
-}
-
 doctor_popup_states() {
     local line
     local option
@@ -127,6 +116,7 @@ print_doctor_report() {
     printf '  %-18s %s\n' "extension" "$EXT"
     printf '  %-18s %s\n' "sort notes" "$SORT_NOTES"
     printf '  %-18s %s\n' "popup size" "$WIDTH x $HEIGHT"
+    printf '  %-18s %s\n' "size delta" "$POPUP_SIZE_DELTA"
     printf '  %-18s %s,%s\n' "popup pos" "$POS_X" "$POS_Y"
     printf '\n'
 

@@ -19,7 +19,7 @@ script_path() {
 }
 
 # order: helpers, loaded config, tmux state/context,
-# note storage, popup rendering, then feature modules
+# note storage, popup rendering, session size, then feature modules
 
 # shellcheck source=scripts/lib/util.sh
 . "$SCRIPT_DIR/lib/util.sh"
@@ -33,6 +33,8 @@ script_path() {
 . "$SCRIPT_DIR/lib/notes.sh"
 # shellcheck source=scripts/lib/popup.sh
 . "$SCRIPT_DIR/lib/popup.sh"
+# shellcheck source=scripts/lib/size.sh
+. "$SCRIPT_DIR/lib/size.sh"
 # shellcheck source=scripts/lib/editor.sh
 . "$SCRIPT_DIR/lib/editor.sh"
 # shellcheck source=scripts/lib/picker.sh
@@ -70,8 +72,9 @@ if [ "$MODE" = "main" ] && toggle_popup_off_if_open; then
 fi
 
 resolve_origin_session
+apply_session_popup_size
 
-debug_log "--- EXEC START --- mode=$MODE raw_client=$RAW_SOURCE_CLIENT cur_client=$CURRENT_CLIENT source_client=$SOURCE_CLIENT cur_sess=$CURRENT_SESSION raw_sess=$RAW_SESSION_NAME src_sess=$SESSION_NAME hidden=$IN_HIDDEN_SESSION"
+debug_log "--- EXEC START --- mode=$MODE raw_client=$RAW_SOURCE_CLIENT cur_client=$CURRENT_CLIENT source_client=$SOURCE_CLIENT cur_sess=$CURRENT_SESSION raw_sess=$RAW_SESSION_NAME src_sess=$SESSION_NAME hidden=$IN_HIDDEN_SESSION size_delta=$POPUP_SIZE_DELTA size=$WIDTH x $HEIGHT"
 
 case "$MODE" in
 main)
@@ -108,6 +111,18 @@ cleanup)
     close_popup "$SOURCE_CLIENT"
     clear_popup_state
     schedule_cleanup_popup
+    ;;
+
+resize_increase)
+    resize_popup "increase"
+    ;;
+
+resize_decrease)
+    resize_popup "decrease"
+    ;;
+
+resize_reset)
+    reset_popup_size
     ;;
 
 open_picker)

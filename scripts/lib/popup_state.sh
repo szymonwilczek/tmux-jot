@@ -89,6 +89,17 @@ popup_state_client() {
     printf '%s' "${rest#*|}"
 }
 
+popup_state_kind() {
+    local state="$1"
+    local rest
+
+    [ -n "$state" ] || return 1
+    [[ "$state" == *"|"* ]] || return 1
+
+    rest="${state#*|}"
+    printf '%s' "${rest%%|*}"
+}
+
 popup_client_from_option_key() {
     local option="$1"
     local safe
