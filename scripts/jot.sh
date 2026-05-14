@@ -18,10 +18,17 @@ script_path() {
     esac
 }
 
+# order: helpers, loaded config, tmux state/context,
+# note storage, popup rendering, then feature modules
+
 # shellcheck source=scripts/lib/util.sh
 . "$SCRIPT_DIR/lib/util.sh"
 # shellcheck source=scripts/lib/config.sh
 . "$SCRIPT_DIR/lib/config.sh"
+# shellcheck source=scripts/lib/popup_state.sh
+. "$SCRIPT_DIR/lib/popup_state.sh"
+# shellcheck source=scripts/lib/context.sh
+. "$SCRIPT_DIR/lib/context.sh"
 # shellcheck source=scripts/lib/notes.sh
 . "$SCRIPT_DIR/lib/notes.sh"
 # shellcheck source=scripts/lib/popup.sh
