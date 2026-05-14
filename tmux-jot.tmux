@@ -23,10 +23,30 @@ KEY=$(get_tmux_option "@jot-key-bind" "j")
 USE_PREFIX=$(get_tmux_option "@jot-use-prefix" "false")
 SCRIPT_PATH="$CURRENT_DIR/scripts/jot.sh"
 SCRIPT_PATH_Q="$(shell_quote "$SCRIPT_PATH")"
-RUN_COMMAND="$SCRIPT_PATH_Q main #{q:client_name} #{q:session_name} > /dev/null 2>&1"
 
-if [ "$USE_PREFIX" == "true" ]; then
-    tmux bind-key "$KEY" run-shell "$RUN_COMMAND"
-else
-    tmux bind-key -n "$KEY" run-shell "$RUN_COMMAND"
-fi
+bind_jot_key() {
+    local key="$1"
+    local use_prefix="$2"
+    local mode="$3"
+    local command
+
+    case "$key" in
+    "" | off | none | disabled) return 0 ;;
+    esac
+
+    command="$SCRIPT_PATH_Q $mode #{q:client_name} #{q:session_name} > /dev/null 2>&1"
+    if [ "$use_prefix" == "true" ]; then
+        tmux bind-key "$key" run-shell "$command"
+    else
+        tmux bind-key -n "$key" run-shell "$command"
+    fi
+}
+
+SWITCH_KEY=$(get_tmux_option "@jot-switch-key-bind" "")
+SWITCH_USE_PREFIX=$(get_tmux_option "@jot-switch-use-prefix" "false")
+CONTENT_SEARCH_KEY=$(get_tmux_option "@jot-content-search-key-bind" "M-w")
+CONTENT_SEARCH_USE_PREFIX=$(get_tmux_option "@jot-content-search-use-prefix" "true")
+
+bind_jot_key "$KEY" "$USE_PREFIX" "main"
+bind_jot_key "$SWITCH_KEY" "$SWITCH_USE_PREFIX" "switch"
+bind_jot_key "$CONTENT_SEARCH_KEY" "$CONTENT_SEARCH_USE_PREFIX" "content_search"
