@@ -120,10 +120,6 @@ load_context_and_config() {
     HEIGHT="${CFG_POPUP_HEIGHT:-50%}"
     POS_X="${CFG_POPUP_X:-100%}"
     POS_Y="${CFG_POPUP_Y:-0}"
-    PICKER_WIDTH="${CFG_PICKER_WIDTH:-50%}"
-    PICKER_HEIGHT="${CFG_PICKER_HEIGHT:-50%}"
-    PICKER_X="${CFG_PICKER_X:-C}"
-    PICKER_Y="${CFG_PICKER_Y:-C}"
 
     ICON="${CFG_ICON:-📝}"
     if [ -n "$CFG_TITLE" ]; then
@@ -140,6 +136,15 @@ load_context_and_config() {
 
     if [ "$POS_X" = "R" ] || [ "$POS_X" = "r" ]; then
         POS_X="100%"
+    fi
+
+    PICKER_WIDTH="${CFG_PICKER_WIDTH:-$WIDTH}"
+    PICKER_HEIGHT="${CFG_PICKER_HEIGHT:-$HEIGHT}"
+    PICKER_X="${CFG_PICKER_X:-$POS_X}"
+    PICKER_Y="${CFG_PICKER_Y:-$POS_Y}"
+
+    if [ "$PICKER_X" = "R" ] || [ "$PICKER_X" = "r" ]; then
+        PICKER_X="100%"
     fi
 }
 
