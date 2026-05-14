@@ -84,14 +84,14 @@ load_context_and_config() {
     local out
     local format
 
-    format="#{client_name}${SEP}#{session_name}${SEP}#{@jot-hidden-session-prefix}${SEP}#{@jot-debug}${SEP}#{@jot-log-file}${SEP}#{@jot-dir}${SEP}#{@jot-extension}${SEP}#{@jot-session-dir}${SEP}#{@jot-editor}${SEP}#{@jot-shell}${SEP}#{@jot-fzf-command}${SEP}#{@jot-fzf-options}${SEP}#{@jot-border-color}${SEP}#{@jot-border-style}${SEP}#{@jot-popup-width}${SEP}#{@jot-popup-height}${SEP}#{@jot-popup-x}${SEP}#{@jot-popup-y}${SEP}#{@jot-title-icon}${SEP}#{@jot-title}${SEP}#{@jot-fzf-prompt}"
+    format="#{client_name}${SEP}#{session_name}${SEP}#{@jot-hidden-session-prefix}${SEP}#{@jot-debug}${SEP}#{@jot-log-file}${SEP}#{@jot-dir}${SEP}#{@jot-extension}${SEP}#{@jot-session-dir}${SEP}#{@jot-editor}${SEP}#{@jot-shell}${SEP}#{@jot-fzf-command}${SEP}#{@jot-fzf-options}${SEP}#{@jot-sort-notes}${SEP}#{@jot-border-color}${SEP}#{@jot-border-style}${SEP}#{@jot-popup-width}${SEP}#{@jot-popup-height}${SEP}#{@jot-popup-x}${SEP}#{@jot-popup-y}${SEP}#{@jot-title-icon}${SEP}#{@jot-title}${SEP}#{@jot-fzf-prompt}"
     out="$(tmux display-message -p "$format" 2>/dev/null || true)"
 
     IFS="$SEP" read -r \
         TMUX_CLIENT TMUX_SESSION CFG_HIDDEN_PREFIX CFG_DEBUG CFG_LOG_FILE \
         CFG_JOT_DIR CFG_EXT CFG_SESSION_DIR CFG_EDITOR CFG_SHELL \
-        CFG_FZF_COMMAND CFG_FZF_OPTIONS CFG_BORDER_COLOR CFG_BORDER_STYLE \
-        CFG_POPUP_WIDTH CFG_POPUP_HEIGHT CFG_POPUP_X CFG_POPUP_Y \
+        CFG_FZF_COMMAND CFG_FZF_OPTIONS CFG_SORT_NOTES CFG_BORDER_COLOR \
+        CFG_BORDER_STYLE CFG_POPUP_WIDTH CFG_POPUP_HEIGHT CFG_POPUP_X CFG_POPUP_Y \
         CFG_ICON CFG_TITLE CFG_FZF_PROMPT <<<"$out"
 
     CURRENT_CLIENT="${RAW_SOURCE_CLIENT:-$TMUX_CLIENT}"
@@ -112,6 +112,7 @@ load_context_and_config() {
     COMMAND_SHELL="${CFG_SHELL:-/bin/bash}"
     FZF_COMMAND="${CFG_FZF_COMMAND:-fzf}"
     FZF_OPTIONS="${CFG_FZF_OPTIONS:-}"
+    SORT_NOTES="${CFG_SORT_NOTES:-off}"
 
     BORDER_COLOR="${CFG_BORDER_COLOR:-#b38d59}"
     BORDER_STYLE="${CFG_BORDER_STYLE:-rounded}"
@@ -614,7 +615,7 @@ ensure_editor_session() {
     fi
 }
 
-list_notes() {
+print_notes() {
     local file
     local name
 
@@ -623,8 +624,16 @@ list_notes() {
         [ -f "$file" ] || continue
         name="${file##*/}"
         printf '%s\n' "${name%."$EXT"}"
-    done | sort
+    done
     shopt -u nullglob
+}
+
+list_notes() {
+    if is_true "$SORT_NOTES"; then
+        print_notes | sort
+    else
+        print_notes
+    fi
 }
 
 run_fzf() {
