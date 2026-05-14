@@ -3,44 +3,9 @@
 set -u
 
 MODE="${1:-main}"
-
-tmux_format() {
-    tmux display-message -p "$1" 2>/dev/null || true
-}
-
-tmux_option() {
-    local option="$1"
-    local default_value="${2:-}"
-    local value
-
-    value="$(tmux show-option -gqv "$option" 2>/dev/null || true)"
-    if [ -n "$value" ]; then
-        printf '%s' "$value"
-    else
-        printf '%s' "$default_value"
-    fi
-}
-
-tmux_target_option() {
-    local target="$1"
-    local option="$2"
-    local default_value="${3:-}"
-    local value
-
-    value="$(tmux show-option -t "$target" -qv "$option" 2>/dev/null || true)"
-    if [ -n "$value" ]; then
-        printf '%s' "$value"
-    else
-        printf '%s' "$default_value"
-    fi
-}
-
-is_true() {
-    case "${1:-}" in
-    1 | on | true | yes | y) return 0 ;;
-    *) return 1 ;;
-    esac
-}
+RAW_SOURCE_CLIENT="${2:-}"
+RAW_SESSION_NAME="${3:-}"
+SEP=$'\036'
 
 expand_path() {
     case "$1" in
@@ -59,27 +24,29 @@ normalize_extension() {
     printf '%s' "$ext"
 }
 
-safe_session_name() {
+safe_name() {
     local input="$1"
     local safe
 
-    safe="$(printf '%s' "$input" | sed 's/[^A-Za-z0-9_-]/_/g')"
+    safe="${input//[^A-Za-z0-9_-]/_}"
     [ -n "$safe" ] || safe="session"
     printf '%s' "$safe"
 }
 
-tmux_title() {
-    printf '%s' "$1" | sed 's/#/##/g'
+trim_space() {
+    local value="$1"
+
+    value="${value//$'\r'/}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
 }
 
-render_template() {
-    local template="$1"
-
-    template="${template//\{icon\}/$ICON}"
-    template="${template//\{session\}/$SESSION_NAME}"
-    template="${template//\{note\}/${NOTE_NAME:-$SESSION_NAME}}"
-    template="${template//\{file\}/$FILE_PATH}"
-    printf '%s' "$template"
+is_true() {
+    case "${1:-}" in
+    1 | on | true | yes | y) return 0 ;;
+    *) return 1 ;;
+    esac
 }
 
 shell_join() {
@@ -95,18 +62,87 @@ shell_join() {
     printf '%s' "$output"
 }
 
-has_note_file() {
-    [ -n "${1:-}" ] && [ -e "$1" ]
+tmux_title() {
+    printf '%s' "${1//#/##}"
 }
 
-message_client() {
-    local message="$1"
+tmux_target_option() {
+    local target="$1"
+    local option="$2"
+    local default_value="${3:-}"
+    local value
 
-    if [ -n "$SOURCE_CLIENT" ]; then
-        tmux display-message -c "$SOURCE_CLIENT" "tmux-jot: $message" 2>/dev/null || true
+    value="$(tmux show-option -t "$target" -qv "$option" 2>/dev/null || true)"
+    if [ -n "$value" ]; then
+        printf '%s' "$value"
     else
-        tmux display-message "tmux-jot: $message" 2>/dev/null || true
+        printf '%s' "$default_value"
     fi
+}
+
+load_context_and_config() {
+    local out
+    local format
+
+    format="#{client_name}${SEP}#{session_name}${SEP}#{@jot-hidden-session-prefix}${SEP}#{@jot-debug}${SEP}#{@jot-log-file}${SEP}#{@jot-dir}${SEP}#{@jot-extension}${SEP}#{@jot-session-dir}${SEP}#{@jot-editor}${SEP}#{@jot-shell}${SEP}#{@jot-fzf-command}${SEP}#{@jot-fzf-options}${SEP}#{@jot-border-color}${SEP}#{@jot-border-style}${SEP}#{@jot-popup-width}${SEP}#{@jot-popup-height}${SEP}#{@jot-popup-x}${SEP}#{@jot-popup-y}${SEP}#{@jot-picker-width}${SEP}#{@jot-picker-height}${SEP}#{@jot-picker-x}${SEP}#{@jot-picker-y}${SEP}#{@jot-title-icon}${SEP}#{@jot-title}${SEP}#{@jot-picker-title}${SEP}#{@jot-fzf-prompt}"
+    out="$(tmux display-message -p "$format" 2>/dev/null || true)"
+
+    IFS="$SEP" read -r \
+        TMUX_CLIENT TMUX_SESSION CFG_HIDDEN_PREFIX CFG_DEBUG CFG_LOG_FILE \
+        CFG_JOT_DIR CFG_EXT CFG_SESSION_DIR CFG_EDITOR CFG_SHELL \
+        CFG_FZF_COMMAND CFG_FZF_OPTIONS CFG_BORDER_COLOR CFG_BORDER_STYLE \
+        CFG_POPUP_WIDTH CFG_POPUP_HEIGHT CFG_POPUP_X CFG_POPUP_Y \
+        CFG_PICKER_WIDTH CFG_PICKER_HEIGHT CFG_PICKER_X CFG_PICKER_Y \
+        CFG_ICON CFG_TITLE CFG_PICKER_TITLE CFG_FZF_PROMPT <<<"$out"
+
+    CURRENT_CLIENT="${RAW_SOURCE_CLIENT:-$TMUX_CLIENT}"
+    CURRENT_SESSION="${RAW_SESSION_NAME:-$TMUX_SESSION}"
+    SOURCE_CLIENT="$CURRENT_CLIENT"
+    SESSION_NAME="$CURRENT_SESSION"
+
+    HIDDEN_PREFIX="${CFG_HIDDEN_PREFIX:-__tmux__jot_}"
+    DEBUG="${CFG_DEBUG:-off}"
+    LOG_FILE="$(expand_path "${CFG_LOG_FILE:-$HOME/.local/state/tmux-jot.log}")"
+
+    JOT_DIR_RAW="${CFG_JOT_DIR:-$HOME/.local/share/tmux-jot}"
+    EXT_RAW="${CFG_EXT:-md}"
+    EXT="$(normalize_extension "$EXT_RAW")"
+    SESSION_DIR_RAW="${CFG_SESSION_DIR:-}"
+
+    EDITOR_COMMAND="${CFG_EDITOR:-${EDITOR:-nvim}}"
+    COMMAND_SHELL="${CFG_SHELL:-/bin/bash}"
+    FZF_COMMAND="${CFG_FZF_COMMAND:-fzf}"
+    FZF_OPTIONS="${CFG_FZF_OPTIONS:-}"
+
+    BORDER_COLOR="${CFG_BORDER_COLOR:-#b38d59}"
+    BORDER_STYLE="${CFG_BORDER_STYLE:-rounded}"
+    WIDTH="${CFG_POPUP_WIDTH:-40%}"
+    HEIGHT="${CFG_POPUP_HEIGHT:-50%}"
+    POS_X="${CFG_POPUP_X:-100%}"
+    POS_Y="${CFG_POPUP_Y:-0}"
+    PICKER_WIDTH="${CFG_PICKER_WIDTH:-50%}"
+    PICKER_HEIGHT="${CFG_PICKER_HEIGHT:-50%}"
+    PICKER_X="${CFG_PICKER_X:-C}"
+    PICKER_Y="${CFG_PICKER_Y:-C}"
+
+    ICON="${CFG_ICON:-📝}"
+    TITLE_TEMPLATE="${CFG_TITLE:- {icon} {note} }"
+    PICKER_TITLE_TEMPLATE="${CFG_PICKER_TITLE:- tmux-jot }"
+    FZF_PROMPT_TEMPLATE="${CFG_FZF_PROMPT:-{icon} Wybierz / Utwórz: }"
+
+    if [ "$POS_X" = "R" ] || [ "$POS_X" = "r" ]; then
+        POS_X="100%"
+    fi
+}
+
+setup_debug_log() {
+    local dir
+
+    is_true "$DEBUG" || return 0
+
+    dir="${LOG_FILE%/*}"
+    [ "$dir" != "$LOG_FILE" ] || dir="."
+    mkdir -p "$dir" 2>/dev/null || true
 }
 
 debug_log() {
@@ -114,6 +150,29 @@ debug_log() {
 
     is_true "$DEBUG" || return 0
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$message" >>"$LOG_FILE" 2>/dev/null || true
+}
+
+script_path() {
+    local path="${BASH_SOURCE[0]}"
+
+    case "$path" in
+    /*) printf '%s' "$path" ;;
+    *) printf '%s/%s' "$PWD" "$path" ;;
+    esac
+}
+
+message_client() {
+    local message="$1"
+
+    if [ -n "${SOURCE_CLIENT:-}" ]; then
+        tmux display-message -c "$SOURCE_CLIENT" "tmux-jot: $message" 2>/dev/null || true
+    else
+        tmux display-message "tmux-jot: $message" 2>/dev/null || true
+    fi
+}
+
+has_note_file() {
+    [ -n "${1:-}" ] && [ -e "$1" ]
 }
 
 note_name_is_valid() {
@@ -126,52 +185,82 @@ note_name_is_valid() {
     return 0
 }
 
-list_notes() {
-    local file
-    local name
+render_template() {
+    local template="$1"
 
-    shopt -s nullglob
-    for file in "$JOT_DIR"/*."$EXT"; do
-        [ -f "$file" ] || continue
-        name="${file##*/}"
-        printf '%s\n' "${name%."$EXT"}"
-    done | sort
-    shopt -u nullglob
+    template="${template//\{icon\}/$ICON}"
+    template="${template//\{session\}/$SESSION_NAME}"
+    template="${template//\{note\}/${NOTE_NAME:-$SESSION_NAME}}"
+    template="${template//\{file\}/$FILE_PATH}"
+    printf '%s' "$template"
 }
 
-run_fzf() {
-    local prompt_quoted
-    local script
+ensure_storage() {
+    [ "${STORAGE_READY:-0}" = "1" ] && return 0
 
-    printf -v prompt_quoted '%q' "$FZF_PROMPT"
-    script="exec $FZF_COMMAND $FZF_OPTIONS --prompt=$prompt_quoted --print-query --expect=enter"
+    JOT_DIR="$(expand_path "$JOT_DIR_RAW")"
+    if ! mkdir -p "$JOT_DIR" 2>/dev/null; then
+        message_client "cannot create note directory: $JOT_DIR"
+        exit 1
+    fi
 
-    "$COMMAND_SHELL" -c "$script"
+    if [ -n "$SESSION_DIR_RAW" ]; then
+        SESSION_DIR="$(expand_path "$SESSION_DIR_RAW")"
+    else
+        SESSION_DIR="$JOT_DIR/.sessions"
+    fi
+
+    if ! mkdir -p "$SESSION_DIR" 2>/dev/null; then
+        message_client "cannot create session directory: $SESSION_DIR"
+        exit 1
+    fi
+
+    STORAGE_READY=1
 }
 
-editor_command() {
+set_note_context_from_file() {
     local file="$1"
-    local file_quoted
+    local note="${2:-}"
+    local base
 
-    printf -v file_quoted '%q' "$file"
-    printf 'exec %s %s' "$EDITOR_COMMAND" "$file_quoted"
+    FILE_PATH="$file"
+    if [ -n "$note" ]; then
+        NOTE_NAME="$note"
+    else
+        base="${FILE_PATH##*/}"
+        NOTE_NAME="${base%."$EXT"}"
+    fi
+
+    SAFE_NOTE_NAME="$(safe_name "$NOTE_NAME")"
+    POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_NOTE_NAME}"
 }
 
-set_hidden_session_options() {
-    tmux set-option -t "$POPUP_SESSION" status off 2>/dev/null || true
-    tmux set-option -t "$POPUP_SESSION" detach-on-destroy on 2>/dev/null || true
-    tmux set-option -t "$POPUP_SESSION" @jot-source-client "$SOURCE_CLIENT" 2>/dev/null || true
-    tmux set-option -t "$POPUP_SESSION" @jot-origin-session "$SESSION_NAME" 2>/dev/null || true
-}
+resolve_note_context() {
+    local base
 
-new_popup_token() {
-    local kind="$1"
+    ensure_storage
 
-    printf '%s:%s:%s' "$kind" "$$" "${RANDOM:-0}"
+    SAFE_SESSION="$(safe_name "$SESSION_NAME")"
+    SESSION_LINK="$SESSION_DIR/${SAFE_SESSION}.${EXT}"
+    FILE_PATH=""
+    NOTE_NAME=""
+
+    if [ -L "$SESSION_LINK" ]; then
+        FILE_PATH="$(readlink "$SESSION_LINK" 2>/dev/null || true)"
+    fi
+
+    if has_note_file "$FILE_PATH"; then
+        base="${FILE_PATH##*/}"
+        NOTE_NAME="${base%."$EXT"}"
+        SAFE_NOTE_NAME="$(safe_name "$NOTE_NAME")"
+        POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_NOTE_NAME}"
+    else
+        POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_SESSION}_picker"
+    fi
 }
 
 popup_state() {
-    tmux_option "$JOT_POPUP_STATE_KEY" ""
+    tmux show-option -gqv "$JOT_POPUP_STATE_KEY" 2>/dev/null || true
 }
 
 set_popup_state() {
@@ -179,26 +268,24 @@ set_popup_state() {
     local kind="$2"
     local owner_pid="$3"
 
-    tmux set-option -gq "$JOT_POPUP_STATE_KEY" "${token}|${kind}|${owner_pid}|${SOURCE_CLIENT}"
+    tmux set-option -gq "$JOT_POPUP_STATE_KEY" "${token}|${kind}|${owner_pid}|${SOURCE_CLIENT}" 2>/dev/null || true
     debug_log "popup state set: client=$SOURCE_CLIENT kind=$kind token=$token pid=$owner_pid"
 }
 
 clear_popup_state() {
-    tmux set-option -guq "$JOT_POPUP_STATE_KEY" 2>/dev/null || tmux set-option -gq "$JOT_POPUP_STATE_KEY" ""
+    tmux set-option -guq "$JOT_POPUP_STATE_KEY" 2>/dev/null || tmux set-option -gq "$JOT_POPUP_STATE_KEY" "" 2>/dev/null || true
 }
 
 clear_popup_state_if_token() {
     local token="$1"
     local state
-    local state_token
 
     [ -n "$token" ] || return 0
 
     state="$(popup_state)"
     [ -n "$state" ] || return 0
 
-    state_token="${state%%|*}"
-    if [ "$state_token" = "$token" ]; then
+    if [ "${state%%|*}" = "$token" ]; then
         debug_log "popup state clear: client=$SOURCE_CLIENT token=$token"
         clear_popup_state
     fi
@@ -212,37 +299,38 @@ begin_popup_lifecycle() {
     local kind="$1"
     local token
 
-    token="$(new_popup_token "$kind")"
+    token="${kind}:$$:${RANDOM:-0}"
     set_popup_state "$token" "$kind" "$$"
     ACTIVE_POPUP_TOKEN="$token"
     trap cleanup_active_popup_state EXIT
     trap 'exit 0' HUP INT TERM
 }
 
-popup_state_is_active() {
+popup_state_owner_pid() {
     local state="$1"
-    local token
     local rest
-    local kind
     local owner_pid
 
     [ -n "$state" ] || return 1
+    [[ "$state" == *"|"* ]] || return 1
 
-    token="${state%%|*}"
     rest="${state#*|}"
-    [ "$rest" != "$state" ] || return 1
     [[ "$rest" == *"|"* ]] || return 1
 
-    kind="${rest%%|*}"
     rest="${rest#*|}"
     owner_pid="${rest%%|*}"
-
-    [ -n "$token" ] || return 1
-    [ -n "$kind" ] || return 1
     case "$owner_pid" in
     "" | *[!0-9]*) return 1 ;;
     esac
 
+    printf '%s' "$owner_pid"
+}
+
+popup_state_is_active() {
+    local owner_pid
+
+    owner_pid="$(popup_state_owner_pid "$1" 2>/dev/null || true)"
+    [ -n "$owner_pid" ] || return 1
     kill -0 "$owner_pid" 2>/dev/null
 }
 
@@ -278,9 +366,7 @@ popup_client_from_option_key() {
         esac
         printf '/dev/pts/%s' "$pts"
         ;;
-    *)
-        return 1
-        ;;
+    *) return 1 ;;
     esac
 }
 
@@ -298,9 +384,7 @@ active_popup_client_from_any_state() {
         state="${line#* }"
         if popup_state_is_active "$state"; then
             client="$(popup_state_client "$state" 2>/dev/null || true)"
-            if [ -z "$client" ]; then
-                client="$(popup_client_from_option_key "$option" 2>/dev/null || true)"
-            fi
+            [ -n "$client" ] || client="$(popup_client_from_option_key "$option" 2>/dev/null || true)"
             if [ -n "$client" ]; then
                 printf '%s' "$client"
                 return 0
@@ -326,6 +410,20 @@ jot_popup_is_open() {
     return 1
 }
 
+close_popup_if_present() {
+    local client="${1:-$CURRENT_CLIENT}"
+
+    if [ -n "$client" ]; then
+        tmux display-popup -c "$client" -C 2>/dev/null
+    else
+        tmux display-popup -C 2>/dev/null
+    fi
+}
+
+close_popup() {
+    close_popup_if_present "$@" || true
+}
+
 toggle_popup_off_if_open() {
     if ! jot_popup_is_open; then
         return 1
@@ -337,13 +435,71 @@ toggle_popup_off_if_open() {
     return 0
 }
 
-normalize_popup_status() {
-    local status="$1"
+load_hidden_context() {
+    local source_client
+    local origin_session
 
-    case "$status" in
-    0 | 129 | 130 | 143) return 0 ;;
-    *) return "$status" ;;
-    esac
+    source_client="$(tmux_target_option "$CURRENT_SESSION" "@jot-source-client" "")"
+    origin_session="$(tmux_target_option "$CURRENT_SESSION" "@jot-origin-session" "")"
+
+    if [ -z "$source_client" ]; then
+        source_client="$(active_popup_client_from_any_state 2>/dev/null || true)"
+    fi
+
+    [ -z "$source_client" ] || SOURCE_CLIENT="$source_client"
+    if [ -n "$origin_session" ] && { [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; }; then
+        SESSION_NAME="$origin_session"
+    fi
+}
+
+resolve_source_context() {
+    IN_HIDDEN_SESSION=0
+
+    if [ -n "$CURRENT_SESSION" ] && [[ "$CURRENT_SESSION" == "$HIDDEN_PREFIX"* ]]; then
+        IN_HIDDEN_SESSION=1
+        load_hidden_context
+    fi
+
+    [ -n "$SOURCE_CLIENT" ] || SOURCE_CLIENT="$CURRENT_CLIENT"
+    SAFE_CLIENT="$(safe_name "$SOURCE_CLIENT")"
+    JOT_POPUP_STATE_KEY="@jot_popup_$SAFE_CLIENT"
+    ACTIVE_POPUP_TOKEN=""
+}
+
+resolve_origin_session() {
+    local stored_origin
+    local parent_session
+
+    if [ -n "$CURRENT_SESSION" ]; then
+        if [[ "$CURRENT_SESSION" != "$HIDDEN_PREFIX"* ]]; then
+            tmux set-option -gq "@jot_origin_$SAFE_CLIENT" "$CURRENT_SESSION" 2>/dev/null || true
+            if [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; then
+                SESSION_NAME="$CURRENT_SESSION"
+            fi
+        else
+            stored_origin="$(tmux show-option -gqv "@jot_origin_$SAFE_CLIENT" 2>/dev/null || true)"
+            if [ -n "$stored_origin" ]; then
+                if [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; then
+                    SESSION_NAME="$stored_origin"
+                fi
+            else
+                parent_session="$(tmux display-message -p '#{client_last_session}' 2>/dev/null || true)"
+                if [ -n "$parent_session" ] && { [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; }; then
+                    SESSION_NAME="$parent_session"
+                fi
+            fi
+        fi
+    else
+        stored_origin="$(tmux show-option -gqv "@jot_origin_$SAFE_CLIENT" 2>/dev/null || true)"
+        if [ -n "$stored_origin" ] && { [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; }; then
+            SESSION_NAME="$stored_origin"
+        fi
+    fi
+
+    if [ -z "$SESSION_NAME" ]; then
+        message_client "cannot resolve source session"
+        exit 1
+    fi
 }
 
 display_popup() {
@@ -377,61 +533,119 @@ display_popup() {
     return 0
 }
 
-close_popup_if_present() {
-    local client="${1:-$CURRENT_CLIENT}"
-
-    if [ -n "$client" ]; then
-        tmux display-popup -c "$client" -C 2>/dev/null
-    else
-        tmux display-popup -C 2>/dev/null
-    fi
+picker_title() {
+    tmux_title "$(render_template "$PICKER_TITLE_TEMPLATE")"
 }
 
-close_popup() {
-    close_popup_if_present "$@" || true
+editor_title() {
+    tmux_title "$(render_template "$TITLE_TEMPLATE")"
+}
+
+fzf_prompt() {
+    render_template "$FZF_PROMPT_TEMPLATE"
+}
+
+popup_editor_command() {
+    shell_join "$SCRIPT_PATH" popup_editor "$SOURCE_CLIENT" "$SESSION_NAME" "$POPUP_SESSION"
 }
 
 display_picker_popup() {
     local command
-    command="$(shell_join "$SCRIPT_PATH" popup_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
-    display_popup "$SOURCE_CLIENT" "$PICKER_WIDTH" "$PICKER_HEIGHT" "$PICKER_X" "$PICKER_Y" "$PICKER_TITLE" "$command"
-}
 
-popup_editor_command() {
-    shell_join "$SCRIPT_PATH" popup_editor "$SOURCE_CLIENT" "$SESSION_NAME"
+    command="$(shell_join "$SCRIPT_PATH" popup_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
+    display_popup "$SOURCE_CLIENT" "$PICKER_WIDTH" "$PICKER_HEIGHT" "$PICKER_X" "$PICKER_Y" "$(picker_title)" "$command"
 }
 
 display_editor_popup() {
-    display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$EDITOR_TITLE" "$(popup_editor_command)"
+    display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$(popup_editor_command)"
 }
 
 schedule_picker_popup() {
     local command
+
     command="$(shell_join "$SCRIPT_PATH" open_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
     debug_log "Scheduling async picker open: $command"
     tmux run-shell -b "$command"
 }
 
 schedule_editor_popup() {
+    local file="${1:-$FILE_PATH}"
+    local note="${2:-$NOTE_NAME}"
     local command
-    command="$(shell_join "$SCRIPT_PATH" open_editor "$SOURCE_CLIENT" "$SESSION_NAME")"
+
+    command="$(shell_join "$SCRIPT_PATH" open_editor "$SOURCE_CLIENT" "$SESSION_NAME" "$file" "$note")"
     debug_log "Scheduling async editor open: $command"
     tmux run-shell -b "$command"
 }
 
+editor_command() {
+    local file="$1"
+    local file_quoted
+
+    printf -v file_quoted '%q' "$file"
+    printf 'exec %s %s' "$EDITOR_COMMAND" "$file_quoted"
+}
+
+set_hidden_session_options() {
+    tmux \
+        set-option -t "$POPUP_SESSION" status off \; \
+        set-option -t "$POPUP_SESSION" detach-on-destroy on \; \
+        set-option -t "$POPUP_SESSION" @jot-source-client "$SOURCE_CLIENT" \; \
+        set-option -t "$POPUP_SESSION" @jot-origin-session "$SESSION_NAME" \
+        2>/dev/null || true
+}
+
 create_editor_session() {
     local command
+
     command="$(editor_command "$FILE_PATH")"
     debug_log "Creating hidden session $POPUP_SESSION with command: $command"
     tmux new-session -d -s "$POPUP_SESSION" "$command"
     set_hidden_session_options
 }
 
+ensure_editor_session() {
+    if ! tmux has-session -t "$POPUP_SESSION" 2>/dev/null; then
+        if ! create_editor_session 2>/dev/null; then
+            message_client "cannot create editor session"
+            debug_log "CRITICAL: create editor session failed"
+            exit 1
+        fi
+    else
+        set_hidden_session_options
+    fi
+}
+
+list_notes() {
+    local file
+    local name
+
+    shopt -s nullglob
+    for file in "$JOT_DIR"/*."$EXT"; do
+        [ -f "$file" ] || continue
+        name="${file##*/}"
+        printf '%s\n' "${name%."$EXT"}"
+    done | sort
+    shopt -u nullglob
+}
+
+run_fzf() {
+    local prompt_quoted
+    local script
+
+    printf -v prompt_quoted '%q' "$(fzf_prompt)"
+    script="exec $FZF_COMMAND $FZF_OPTIONS --prompt=$prompt_quoted --print-query --expect=enter"
+
+    "$COMMAND_SHELL" -c "$script"
+}
+
 select_note() {
     local fzf_out
     local fzf_status
-    local query
-    local selection
+    local line
+    local line_no=0
+    local query=""
+    local selection=""
     local target_note
 
     fzf_out="$(list_notes | run_fzf)"
@@ -442,8 +656,16 @@ select_note() {
         exit 0
     fi
 
-    query="$(printf '%s\n' "$fzf_out" | sed -n '1p' | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    selection="$(printf '%s\n' "$fzf_out" | sed -n '3p' | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    while IFS= read -r line; do
+        line_no=$((line_no + 1))
+        case "$line_no" in
+        1) query="$(trim_space "$line")" ;;
+        3)
+            selection="$(trim_space "$line")"
+            break
+            ;;
+        esac
+    done <<<"$fzf_out"
 
     if [ -n "$selection" ]; then
         target_note="$selection"
@@ -454,7 +676,6 @@ select_note() {
     fi
 
     target_note="${target_note%."$EXT"}"
-
     if ! note_name_is_valid "$target_note"; then
         message_client "invalid note name"
         debug_log "invalid note name: selected=$target_note session=$SESSION_NAME"
@@ -479,50 +700,41 @@ prepare_selected_note() {
         exit 1
     fi
 
-    debug_log "selected note: session=$SESSION_NAME file=$target_file link=$SESSION_LINK"
+    set_note_context_from_file "$target_file" "$SELECTED_NOTE"
+    debug_log "selected note: session=$SESSION_NAME file=$FILE_PATH link=$SESSION_LINK"
 }
 
-# INIT
-SOURCE_CLIENT="${2:-}"
-SESSION_NAME="${3:-}"
-RAW_SOURCE_CLIENT="$SOURCE_CLIENT"
-RAW_SESSION_NAME="$SESSION_NAME"
-CURRENT_CLIENT="$(tmux_format '#{client_name}')"
-CURRENT_SESSION="$(tmux_format '#{session_name}')"
-HIDDEN_PREFIX="$(tmux_option "@jot-hidden-session-prefix" "__tmux__jot_")"
-DEBUG="$(tmux_option "@jot-debug" "off")"
-LOG_FILE="$(expand_path "$(tmux_option "@jot-log-file" "$HOME/.local/state/tmux-jot.log")")"
-SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || printf '%s' "$0")"
-IN_HIDDEN_SESSION=0
+open_picker() {
+    resolve_note_context
+    display_picker_popup
+}
 
-if is_true "$DEBUG"; then
-    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
-fi
+open_editor() {
+    local file_arg="${1:-}"
+    local note_arg="${2:-}"
 
-if [ -n "$CURRENT_SESSION" ] && [[ "$CURRENT_SESSION" == "$HIDDEN_PREFIX"* ]]; then
-    IN_HIDDEN_SESSION=1
-
-    SESSION_SOURCE_CLIENT="$(tmux_target_option "$CURRENT_SESSION" "@jot-source-client" "")"
-    SESSION_ORIGIN="$(tmux_target_option "$CURRENT_SESSION" "@jot-origin-session" "")"
-
-    if [ -z "$SESSION_SOURCE_CLIENT" ]; then
-        SESSION_SOURCE_CLIENT="$(active_popup_client_from_any_state 2>/dev/null || true)"
+    if [ -n "$file_arg" ] && has_note_file "$file_arg"; then
+        set_note_context_from_file "$file_arg" "$note_arg"
+    else
+        resolve_note_context
     fi
 
-    if [ -n "$SESSION_SOURCE_CLIENT" ]; then
-        SOURCE_CLIENT="$SESSION_SOURCE_CLIENT"
-    fi
+    ensure_editor_session
+    display_editor_popup
+}
 
-    if [ -n "$SESSION_ORIGIN" ] && { [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; }; then
-        SESSION_NAME="$SESSION_ORIGIN"
-    fi
-fi
+load_context_and_config
+setup_debug_log
 
-[ -n "$SOURCE_CLIENT" ] || SOURCE_CLIENT="$CURRENT_CLIENT"
+SCRIPT_PATH="$(script_path)"
+STORAGE_READY=0
+FILE_PATH=""
+NOTE_NAME=""
+POPUP_SESSION=""
+SESSION_LINK=""
+SAFE_SESSION=""
 
-SAFE_CLIENT="$(printf '%s' "$SOURCE_CLIENT" | sed 's/[^A-Za-z0-9_-]/_/g')"
-JOT_POPUP_STATE_KEY="@jot_popup_$SAFE_CLIENT"
-ACTIVE_POPUP_TOKEN=""
+resolve_source_context
 trap cleanup_active_popup_state EXIT
 
 if [ "$MODE" = "main" ] && [ "$IN_HIDDEN_SESSION" = "1" ]; then
@@ -532,146 +744,24 @@ if [ "$MODE" = "main" ] && [ "$IN_HIDDEN_SESSION" = "1" ]; then
     exit 0
 fi
 
-# SESSION MEMORY MANAGEMENT
-if [ -n "$CURRENT_SESSION" ]; then
-    if [[ "$CURRENT_SESSION" != "$HIDDEN_PREFIX"* ]]; then
-        # normal session
-        tmux set-option -gq "@jot_origin_$SAFE_CLIENT" "$CURRENT_SESSION"
-        if [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; then
-            SESSION_NAME="$CURRENT_SESSION"
-        fi
-    else
-        # modes called from popup
-        STORED_ORIGIN="$(tmux_option "@jot_origin_$SAFE_CLIENT" "")"
-        if [ -n "$STORED_ORIGIN" ]; then
-            if [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; then
-                SESSION_NAME="$STORED_ORIGIN"
-            fi
-        else
-            PARENT_SESSION="$(tmux_format '#{client_last_session}')"
-            if [ -n "$PARENT_SESSION" ] && { [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; }; then
-                SESSION_NAME="$PARENT_SESSION"
-            fi
-        fi
-    fi
-else
-    # picker does not get his own session
-    STORED_ORIGIN="$(tmux_option "@jot_origin_$SAFE_CLIENT" "")"
-    if [ -n "$STORED_ORIGIN" ]; then
-        if [ -z "$SESSION_NAME" ] || [[ "$SESSION_NAME" == "$HIDDEN_PREFIX"* ]]; then
-            SESSION_NAME="$STORED_ORIGIN"
-        fi
-    fi
+if [ "$MODE" = "main" ] && toggle_popup_off_if_open; then
+    exit 0
 fi
 
-if [ -z "$SESSION_NAME" ]; then
-    message_client "cannot resolve source session"
-    exit 1
-fi
+resolve_origin_session
 
-JOT_DIR="$(expand_path "$(tmux_option "@jot-dir" "$HOME/.local/share/tmux-jot")")"
-if ! mkdir -p "$JOT_DIR" 2>/dev/null; then
-    message_client "cannot create note directory: $JOT_DIR"
-    exit 1
-fi
-
-EXT="$(normalize_extension "$(tmux_option "@jot-extension" "md")")"
-SAFE_SESSION="$(safe_session_name "$SESSION_NAME")"
-SESSION_KEY="${SAFE_SESSION}"
-SESSION_DIR="$(expand_path "$(tmux_option "@jot-session-dir" "$JOT_DIR/.sessions")")"
-
-if ! mkdir -p "$SESSION_DIR" 2>/dev/null; then
-    message_client "cannot create session directory: $SESSION_DIR"
-    exit 1
-fi
-
-SESSION_LINK="$SESSION_DIR/${SESSION_KEY}.${EXT}"
-
-if [ -L "$SESSION_LINK" ]; then
-    FILE_PATH="$(readlink "$SESSION_LINK")"
-else
-    FILE_PATH=""
-fi
-
-if [ -n "$FILE_PATH" ] && has_note_file "$FILE_PATH"; then
-    NOTE_NAME="$(basename "$FILE_PATH" ".$EXT")"
-    SAFE_NOTE_NAME="$(safe_session_name "$NOTE_NAME")"
-    POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_NOTE_NAME}"
-else
-    NOTE_NAME=""
-    POPUP_SESSION="${HIDDEN_PREFIX}${SESSION_KEY}_picker"
-fi
-
-EDITOR_COMMAND="$(tmux_option "@jot-editor" "${EDITOR:-nvim}")"
-COMMAND_SHELL="$(tmux_option "@jot-shell" "/bin/bash")"
-FZF_COMMAND="$(tmux_option "@jot-fzf-command" "fzf")"
-FZF_OPTIONS="$(tmux_option "@jot-fzf-options" "")"
-
-BORDER_COLOR="$(tmux_option "@jot-border-color" "#b38d59")"
-BORDER_STYLE="$(tmux_option "@jot-border-style" "rounded")"
-
-WIDTH="$(tmux_option "@jot-popup-width" "40%")"
-HEIGHT="$(tmux_option "@jot-popup-height" "50%")"
-POS_X="$(tmux_option "@jot-popup-x" "100%")"
-POS_Y="$(tmux_option "@jot-popup-y" "0")"
-
-if [ "$POS_X" = "R" ] || [ "$POS_X" = "r" ]; then
-    POS_X="100%"
-fi
-
-PICKER_WIDTH="$(tmux_option "@jot-picker-width" "50%")"
-PICKER_HEIGHT="$(tmux_option "@jot-picker-height" "50%")"
-PICKER_X="$(tmux_option "@jot-picker-x" "C")"
-PICKER_Y="$(tmux_option "@jot-picker-y" "C")"
-
-ICON="$(tmux_option "@jot-title-icon" "📝")"
-EDITOR_TITLE="$(tmux_title "$(render_template "$(tmux_option "@jot-title" " {icon} {note} ")")")"
-PICKER_TITLE="$(tmux_title "$(render_template "$(tmux_option "@jot-picker-title" " tmux-jot ")")")"
-FZF_PROMPT="$(render_template "$(tmux_option "@jot-fzf-prompt" "{icon} Wybierz / Utwórz: ")")"
-
-debug_log "--- EXEC START --- mode=$MODE raw_client=$RAW_SOURCE_CLIENT cur_client=$CURRENT_CLIENT source_client=$SOURCE_CLIENT cur_sess=$CURRENT_SESSION raw_sess=$RAW_SESSION_NAME src_sess=$SESSION_NAME file=$FILE_PATH popup=$POPUP_SESSION safe_client=$SAFE_CLIENT hidden=$IN_HIDDEN_SESSION"
+debug_log "--- EXEC START --- mode=$MODE raw_client=$RAW_SOURCE_CLIENT cur_client=$CURRENT_CLIENT source_client=$SOURCE_CLIENT cur_sess=$CURRENT_SESSION raw_sess=$RAW_SESSION_NAME src_sess=$SESSION_NAME hidden=$IN_HIDDEN_SESSION"
 
 case "$MODE" in
-popup_picker)
-    begin_popup_lifecycle "picker"
-    select_note
-    prepare_selected_note
-
-    schedule_editor_popup
-    exit 0
-    ;;
-
-popup_editor)
-    begin_popup_lifecycle "editor"
-    tmux attach-session -t "$POPUP_SESSION" 2>/dev/null || true
-    exit 0
-    ;;
-
-open_picker)
-    if ! display_picker_popup 2>/dev/null; then
-        if close_popup_if_present "$SOURCE_CLIENT"; then
-            clear_popup_state
-            schedule_picker_popup
-            exit 0
-        fi
-
-        message_client "cannot open picker popup"
-        debug_log "CRITICAL: picker popup failed in open_picker mode"
-        exit 1
-    fi
-    ;;
-
-open_editor)
-    if ! tmux has-session -t "$POPUP_SESSION" 2>/dev/null; then
-        create_editor_session
+main)
+    resolve_note_context
+    if has_note_file "$FILE_PATH"; then
+        open_editor "$FILE_PATH" "$NOTE_NAME"
     else
-        set_hidden_session_options
-    fi
-
-    if ! display_editor_popup 2>/dev/null; then
-        message_client "cannot open editor popup"
-        debug_log "CRITICAL: editor popup failed in open_editor"
-        exit 1
+        if tmux has-session -t "$POPUP_SESSION" 2>/dev/null; then
+            tmux kill-session -t "$POPUP_SESSION" 2>/dev/null || true
+        fi
+        display_picker_popup
     fi
     ;;
 
@@ -679,51 +769,31 @@ switch | search)
     close_popup "$SOURCE_CLIENT"
     clear_popup_state
     schedule_picker_popup
-    exit 0
     ;;
 
-main)
-    if toggle_popup_off_if_open; then
-        exit 0
+open_picker)
+    open_picker
+    ;;
+
+open_editor)
+    open_editor "${4:-}" "${5:-}"
+    ;;
+
+popup_picker)
+    resolve_note_context
+    begin_popup_lifecycle "picker"
+    select_note
+    prepare_selected_note
+    schedule_editor_popup "$FILE_PATH" "$NOTE_NAME"
+    ;;
+
+popup_editor)
+    POPUP_SESSION="${4:-}"
+    if [ -z "$POPUP_SESSION" ]; then
+        resolve_note_context
     fi
-
-    if has_note_file "$FILE_PATH"; then
-        if ! tmux has-session -t "$POPUP_SESSION" 2>/dev/null; then
-            if ! create_editor_session 2>/dev/null; then
-                message_client "cannot create editor session"
-                debug_log "CRITICAL: create editor session failed"
-                exit 1
-            fi
-        else
-            set_hidden_session_options
-        fi
-
-        if ! display_editor_popup 2>/dev/null; then
-            if close_popup_if_present "$SOURCE_CLIENT"; then
-                clear_popup_state
-                exit 0
-            fi
-
-            message_client "cannot open editor popup"
-            debug_log "CRITICAL: editor popup failed"
-            exit 1
-        fi
-    else
-        if tmux has-session -t "$POPUP_SESSION" 2>/dev/null; then
-            tmux kill-session -t "$POPUP_SESSION" 2>/dev/null || true
-        fi
-
-        if ! display_picker_popup 2>/dev/null; then
-            if close_popup_if_present "$SOURCE_CLIENT"; then
-                clear_popup_state
-                exit 0
-            fi
-
-            message_client "cannot open picker popup"
-            debug_log "CRITICAL: picker popup failed"
-            exit 1
-        fi
-    fi
+    begin_popup_lifecycle "editor"
+    tmux attach-session -t "$POPUP_SESSION" 2>/dev/null || true
     ;;
 
 *)
