@@ -581,6 +581,13 @@ display_doctor_popup() {
     display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$command"
 }
 
+display_cleanup_popup() {
+    local command
+
+    command="$(shell_join "$SCRIPT_PATH" popup_cleanup "$SOURCE_CLIENT" "$SESSION_NAME")"
+    display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$command"
+}
+
 display_editor_popup() {
     display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$(popup_editor_command)"
 }
@@ -606,6 +613,14 @@ schedule_doctor_popup() {
 
     command="$(shell_join "$SCRIPT_PATH" open_doctor "$SOURCE_CLIENT" "$SESSION_NAME")"
     debug_log "Scheduling async doctor open: $command"
+    tmux run-shell -b "$command"
+}
+
+schedule_cleanup_popup() {
+    local command
+
+    command="$(shell_join "$SCRIPT_PATH" open_cleanup "$SOURCE_CLIENT" "$SESSION_NAME")"
+    debug_log "Scheduling async cleanup open: $command"
     tmux run-shell -b "$command"
 }
 
@@ -991,6 +1006,45 @@ print_doctor_report() {
     doctor_popup_states
 }
 
+print_cleanup_report() {
+    local session
+    local attached
+    local killed=0
+    local skipped=0
+    local failed=0
+
+    printf 'tmux-jot cleanup\n'
+    printf '================\n\n'
+    printf 'Killing detached hidden sessions matching %s*\n\n' "$HIDDEN_PREFIX"
+
+    while IFS=$'\t' read -r session attached; do
+        [[ "$session" == "$HIDDEN_PREFIX"* ]] || continue
+
+        if [ "${attached:-0}" != "0" ]; then
+            skipped=$((skipped + 1))
+            printf '  skip  %-30s attached=%s\n' "$session" "$attached"
+            continue
+        fi
+
+        if tmux kill-session -t "$session" 2>/dev/null; then
+            killed=$((killed + 1))
+            printf '  kill  %s\n' "$session"
+        else
+            failed=$((failed + 1))
+            printf '  fail  %s\n' "$session"
+        fi
+    done < <(tmux list-sessions -F "#{session_name}"$'\t'"#{session_attached}" 2>/dev/null || true)
+
+    if [ "$killed" -eq 0 ] && [ "$skipped" -eq 0 ] && [ "$failed" -eq 0 ]; then
+        printf '  none\n'
+    fi
+
+    printf '\nSummary\n'
+    printf '  killed  %s\n' "$killed"
+    printf '  skipped %s\n' "$skipped"
+    printf '  failed  %s\n' "$failed"
+}
+
 wait_for_key() {
     printf '\nPress any key to close...'
     IFS= read -r -n 1 REPLY || true
@@ -1010,6 +1064,11 @@ open_content_search() {
 open_doctor() {
     resolve_note_context
     display_doctor_popup
+}
+
+open_cleanup() {
+    resolve_note_context
+    display_cleanup_popup
 }
 
 open_editor() {
@@ -1086,6 +1145,12 @@ doctor)
     schedule_doctor_popup
     ;;
 
+cleanup)
+    close_popup "$SOURCE_CLIENT"
+    clear_popup_state
+    schedule_cleanup_popup
+    ;;
+
 open_picker)
     open_picker
     ;;
@@ -1096,6 +1161,10 @@ open_content_search)
 
 open_doctor)
     open_doctor
+    ;;
+
+open_cleanup)
+    open_cleanup
     ;;
 
 open_editor)
@@ -1122,6 +1191,13 @@ popup_doctor)
     resolve_note_context
     begin_popup_lifecycle "doctor"
     print_doctor_report
+    wait_for_key
+    ;;
+
+popup_cleanup)
+    resolve_note_context
+    begin_popup_lifecycle "cleanup"
+    print_cleanup_report
     wait_for_key
     ;;
 
