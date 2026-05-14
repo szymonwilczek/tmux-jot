@@ -19,70 +19,6 @@ script_path() {
 }
 
 
-ensure_storage() {
-    [ "${STORAGE_READY:-0}" = "1" ] && return 0
-
-    JOT_DIR="$(expand_path "$JOT_DIR_RAW")"
-    if ! mkdir -p "$JOT_DIR" 2>/dev/null; then
-        message_client "cannot create note directory: $JOT_DIR"
-        exit 1
-    fi
-
-    if [ -n "$SESSION_DIR_RAW" ]; then
-        SESSION_DIR="$(expand_path "$SESSION_DIR_RAW")"
-    else
-        SESSION_DIR="$JOT_DIR/.sessions"
-    fi
-
-    if ! mkdir -p "$SESSION_DIR" 2>/dev/null; then
-        message_client "cannot create session directory: $SESSION_DIR"
-        exit 1
-    fi
-
-    STORAGE_READY=1
-}
-
-set_note_context_from_file() {
-    local file="$1"
-    local note="${2:-}"
-    local base
-
-    FILE_PATH="$file"
-    if [ -n "$note" ]; then
-        NOTE_NAME="$note"
-    else
-        base="${FILE_PATH##*/}"
-        NOTE_NAME="${base%."$EXT"}"
-    fi
-
-    SAFE_NOTE_NAME="$(safe_name "$NOTE_NAME")"
-    POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_NOTE_NAME}"
-}
-
-resolve_note_context() {
-    local base
-
-    ensure_storage
-
-    SAFE_SESSION="$(safe_name "$SESSION_NAME")"
-    SESSION_LINK="$SESSION_DIR/${SAFE_SESSION}.${EXT}"
-    FILE_PATH=""
-    NOTE_NAME=""
-
-    if [ -L "$SESSION_LINK" ]; then
-        FILE_PATH="$(readlink "$SESSION_LINK" 2>/dev/null || true)"
-    fi
-
-    if has_note_file "$FILE_PATH"; then
-        base="${FILE_PATH##*/}"
-        NOTE_NAME="${base%."$EXT"}"
-        SAFE_NOTE_NAME="$(safe_name "$NOTE_NAME")"
-        POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_NOTE_NAME}"
-    else
-        POPUP_SESSION="${HIDDEN_PREFIX}${SAFE_SESSION}_picker"
-    fi
-}
-
 popup_state() {
     tmux show-option -gqv "$JOT_POPUP_STATE_KEY" 2>/dev/null || true
 }
@@ -485,27 +421,6 @@ ensure_editor_session() {
     fi
 }
 
-print_notes() {
-    local file
-    local name
-
-    shopt -s nullglob
-    for file in "$JOT_DIR"/*."$EXT"; do
-        [ -f "$file" ] || continue
-        name="${file##*/}"
-        printf '%s\n' "${name%."$EXT"}"
-    done
-    shopt -u nullglob
-}
-
-list_notes() {
-    if is_true "$SORT_NOTES"; then
-        print_notes | sort
-    else
-        print_notes
-    fi
-}
-
 run_fzf() {
     local prompt_quoted
     local script
@@ -562,71 +477,6 @@ run_content_fzf() {
     "$COMMAND_SHELL" -c "$script"
 }
 
-select_note() {
-    local fzf_out
-    local fzf_status
-    local line
-    local line_no=0
-    local query=""
-    local selection=""
-    local target_note
-
-    fzf_out="$(list_notes | run_fzf)"
-    fzf_status=$?
-
-    if [ "$fzf_status" -ne 0 ] || [ -z "$fzf_out" ]; then
-        debug_log "picker cancelled: status=$fzf_status session=$SESSION_NAME"
-        exit 0
-    fi
-
-    while IFS= read -r line; do
-        line_no=$((line_no + 1))
-        case "$line_no" in
-        1) query="$(trim_space "$line")" ;;
-        3)
-            selection="$(trim_space "$line")"
-            break
-            ;;
-        esac
-    done <<<"$fzf_out"
-
-    if [ -n "$selection" ]; then
-        target_note="$selection"
-        debug_log "User selected existing note: $target_note"
-    else
-        target_note="$query"
-        debug_log "User wants to create new note from query: $target_note"
-    fi
-
-    target_note="${target_note%."$EXT"}"
-    if ! note_name_is_valid "$target_note"; then
-        message_client "invalid note name"
-        debug_log "invalid note name: selected=$target_note session=$SESSION_NAME"
-        exit 1
-    fi
-
-    SELECTED_NOTE="$target_note"
-}
-
-prepare_selected_note() {
-    local target_file="$JOT_DIR/${SELECTED_NOTE}.${EXT}"
-
-    if ! touch "$target_file" 2>/dev/null; then
-        message_client "cannot create note: $target_file"
-        debug_log "touch failed: target=$target_file session=$SESSION_NAME"
-        exit 1
-    fi
-
-    if ! ln -sfn "$target_file" "$SESSION_LINK" 2>/dev/null; then
-        message_client "cannot link session note: $SESSION_LINK -> $target_file"
-        debug_log "link failed: source=$target_file target=$SESSION_LINK session=$SESSION_NAME"
-        exit 1
-    fi
-
-    set_note_context_from_file "$target_file" "$SELECTED_NOTE"
-    debug_log "selected note: session=$SESSION_NAME file=$FILE_PATH link=$SESSION_LINK"
-}
-
 select_content_match() {
     local fzf_out
     local fzf_status
@@ -669,14 +519,6 @@ select_content_match() {
 
     set_note_context_from_file "$target_file"
     debug_log "content search selected: query=$query session=$SESSION_NAME file=$FILE_PATH note=$NOTE_NAME"
-}
-
-link_selected_note() {
-    if ! ln -sfn "$FILE_PATH" "$SESSION_LINK" 2>/dev/null; then
-        message_client "cannot link session note: $SESSION_LINK -> $FILE_PATH"
-        debug_log "link failed: source=$FILE_PATH target=$SESSION_LINK session=$SESSION_NAME"
-        exit 1
-    fi
 }
 
 doctor_command_line() {
