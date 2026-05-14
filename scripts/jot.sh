@@ -18,42 +18,24 @@ script_path() {
     esac
 }
 
-editor_command() {
-    local file="$1"
-    local file_quoted
-
-    printf -v file_quoted '%q' "$file"
-    printf 'exec %s %s' "$EDITOR_COMMAND" "$file_quoted"
-}
-
-set_hidden_session_options() {
-    tmux \
-        set-option -t "$POPUP_SESSION" status off \; \
-        set-option -t "$POPUP_SESSION" detach-on-destroy on \; \
-        set-option -t "$POPUP_SESSION" @jot-source-client "$SOURCE_CLIENT" \; \
-        set-option -t "$POPUP_SESSION" @jot-origin-session "$SESSION_NAME" \
-        2>/dev/null || true
-}
-
-command_binary() {
-    local command="$RG_COMMAND"
-
-    if [ "$#" -gt 0 ]; then
-        command="$1"
-    fi
-    command="${command%% *}"
-    printf '%s' "$command"
-}
-
-doctor_path_line() {
-    local label="$1"
-    local path="$2"
-    local status="missing"
-
-    [ -e "$path" ] && status="ok"
-    printf '  %-18s %-7s %s\n' "$label" "$status" "$path"
-}
-
+# shellcheck source=scripts/lib/util.sh
+. "$SCRIPT_DIR/lib/util.sh"
+# shellcheck source=scripts/lib/config.sh
+. "$SCRIPT_DIR/lib/config.sh"
+# shellcheck source=scripts/lib/notes.sh
+. "$SCRIPT_DIR/lib/notes.sh"
+# shellcheck source=scripts/lib/popup.sh
+. "$SCRIPT_DIR/lib/popup.sh"
+# shellcheck source=scripts/lib/editor.sh
+. "$SCRIPT_DIR/lib/editor.sh"
+# shellcheck source=scripts/lib/picker.sh
+. "$SCRIPT_DIR/lib/picker.sh"
+# shellcheck source=scripts/lib/content_search.sh
+. "$SCRIPT_DIR/lib/content_search.sh"
+# shellcheck source=scripts/lib/doctor.sh
+. "$SCRIPT_DIR/lib/doctor.sh"
+# shellcheck source=scripts/lib/cleanup.sh
+. "$SCRIPT_DIR/lib/cleanup.sh"
 
 load_context_and_config
 setup_debug_log
