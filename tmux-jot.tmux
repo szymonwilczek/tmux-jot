@@ -46,7 +46,10 @@ SWITCH_KEY=$(get_tmux_option "@jot-switch-key-bind" "")
 SWITCH_USE_PREFIX=$(get_tmux_option "@jot-switch-use-prefix" "false")
 CONTENT_SEARCH_KEY=$(get_tmux_option "@jot-content-search-key-bind" "M-w")
 CONTENT_SEARCH_USE_PREFIX=$(get_tmux_option "@jot-content-search-use-prefix" "true")
+DOCTOR_KEY=$(get_tmux_option "@jot-doctor-key-bind" "M-i")
+DOCTOR_USE_PREFIX=$(get_tmux_option "@jot-doctor-use-prefix" "true")
 
 bind_jot_key "$KEY" "$USE_PREFIX" "main"
 bind_jot_key "$SWITCH_KEY" "$SWITCH_USE_PREFIX" "switch"
 bind_jot_key "$CONTENT_SEARCH_KEY" "$CONTENT_SEARCH_USE_PREFIX" "content_search"
+bind_jot_key "$DOCTOR_KEY" "$DOCTOR_USE_PREFIX" "doctor"
