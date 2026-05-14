@@ -2,9 +2,11 @@
 
 CURRENT_SESSION=$(tmux display-message -p '#S')
 
-if [[ "$CURRENT_SESSION" == __tmux__jot_* ]]; then
-    tmux detach-client
-    exit 0
+if [ "$1" == "main" ]; then
+    if [[ "$CURRENT_SESSION" == __tmux__jot_* ]]; then
+        tmux detach-client
+        exit 0
+    fi
 fi
 
 SESSION_NAME="$CURRENT_SESSION"
@@ -52,6 +54,8 @@ SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo
 
 # PICKER
 if [ "$1" == "internal_picker" ]; then
+    tmux set-option -t "$POPUP_SESSION" status off 2>/dev/null
+
     SELECTED=$(ls -1 "$JOT_DIR" 2>/dev/null | grep "\.${EXT}$" | sed "s/\.${EXT}$//" | fzf --prompt="$ICON Wybierz / Utwórz: " --print-query | tail -n 1)
 
     if [ -n "$SELECTED" ]; then
@@ -63,7 +67,7 @@ if [ "$1" == "internal_picker" ]; then
         fi
 
         tmux detach-client
-        tmux run-shell -b "tmux display-popup -b \"$BORDER_STYLE\" -S \"fg=$BORDER_COLOR\" -w \"$WIDTH\" -h \"$HEIGHT\" -x \"$POS_X\" -y \"$POS_Y\" -T \" $ICON $SESSION_NAME \" -E \"tmux attach-session -t '$POPUP_SESSION'\""
+        tmux run-shell -b "$SCRIPT_PATH open_editor"
         exec $EDITOR "$FILE_PATH"
     fi
 
@@ -71,7 +75,14 @@ if [ "$1" == "internal_picker" ]; then
     exit 0
 fi
 
-# TOGGLE ON
+# EDITOR
+if [ "$1" == "open_editor" ]; then
+    tmux set-option -t "$POPUP_SESSION" status off 2>/dev/null
+    tmux display-popup -b "$BORDER_STYLE" -S "fg=$BORDER_COLOR" -w "$WIDTH" -h "$HEIGHT" -x "$POS_X" -y "$POS_Y" -T " $ICON $SESSION_NAME " -E "tmux attach-session -t '$POPUP_SESSION'"
+    exit 0
+fi
+
+# MAIN
 if [ "$1" == "main" ]; then
     if [ -e "$FILE_PATH" ]; then
         # EDITOR MODE: file exists
@@ -81,6 +92,7 @@ if [ "$1" == "main" ]; then
             tmux set-option -t "$POPUP_SESSION" status off
         fi
         # anchor
+        tmux set-option -t "$POPUP_SESSION" status off 2>/dev/null
         tmux display-popup -b "$BORDER_STYLE" -S "fg=$BORDER_COLOR" -w "$WIDTH" -h "$HEIGHT" -x "$POS_X" -y "$POS_Y" -T " $ICON $SESSION_NAME " -E "tmux attach-session -t '$POPUP_SESSION'"
     else
         # PICKER MODE: no file
@@ -90,6 +102,7 @@ if [ "$1" == "main" ]; then
         tmux new-session -d -s "$POPUP_SESSION" "$SCRIPT_PATH internal_picker"
         tmux set-option -t "$POPUP_SESSION" detach-on-destroy on
         tmux set-option -t "$POPUP_SESSION" status off
+        tmux set-option -t "$POPUP_SESSION" status off 2>/dev/null
         tmux display-popup -b "$BORDER_STYLE" -S "fg=$BORDER_COLOR" -w 50% -h 50% -x C -y C -T " tmux-jot " -E "tmux attach-session -t '$POPUP_SESSION'"
     fi
     exit 0
