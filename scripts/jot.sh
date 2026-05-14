@@ -18,13 +18,6 @@ script_path() {
     esac
 }
 
-display_picker_popup() {
-    local command
-
-    command="$(shell_join "$SCRIPT_PATH" popup_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
-    display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$command"
-}
-
 display_doctor_popup() {
     local command
 
@@ -254,11 +247,6 @@ wait_for_key() {
     printf '\nPress any key to close...'
     IFS= read -r -n 1 REPLY || true
     printf '\n'
-}
-
-open_picker() {
-    resolve_note_context
-    display_picker_popup
 }
 
 open_doctor() {
