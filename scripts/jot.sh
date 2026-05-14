@@ -18,35 +18,6 @@ script_path() {
     esac
 }
 
-message_client() {
-    local message="$1"
-
-    if [ -n "${SOURCE_CLIENT:-}" ]; then
-        tmux display-message -c "$SOURCE_CLIENT" "tmux-jot: $message" 2>/dev/null || true
-    else
-        tmux display-message "tmux-jot: $message" 2>/dev/null || true
-    fi
-}
-
-note_name_is_valid() {
-    local name="$1"
-
-    [ -n "$name" ] || return 1
-    [[ "$name" != *"/"* ]] || return 1
-    [[ "$name" != *$'\n'* ]] || return 1
-    [[ "$name" != *$'\r'* ]] || return 1
-    return 0
-}
-
-render_template() {
-    local template="$1"
-
-    template="${template//\{icon\}/$ICON}"
-    template="${template//\{session\}/$SESSION_NAME}"
-    template="${template//\{note\}/${NOTE_NAME:-$SESSION_NAME}}"
-    template="${template//\{file\}/$FILE_PATH}"
-    printf '%s' "$template"
-}
 
 ensure_storage() {
     [ "${STORAGE_READY:-0}" = "1" ] && return 0
