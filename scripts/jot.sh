@@ -84,7 +84,7 @@ load_context_and_config() {
     local out
     local format
 
-    format="#{client_name}${SEP}#{session_name}${SEP}#{@jot-hidden-session-prefix}${SEP}#{@jot-debug}${SEP}#{@jot-log-file}${SEP}#{@jot-dir}${SEP}#{@jot-extension}${SEP}#{@jot-session-dir}${SEP}#{@jot-editor}${SEP}#{@jot-shell}${SEP}#{@jot-fzf-command}${SEP}#{@jot-fzf-options}${SEP}#{@jot-border-color}${SEP}#{@jot-border-style}${SEP}#{@jot-popup-width}${SEP}#{@jot-popup-height}${SEP}#{@jot-popup-x}${SEP}#{@jot-popup-y}${SEP}#{@jot-picker-width}${SEP}#{@jot-picker-height}${SEP}#{@jot-picker-x}${SEP}#{@jot-picker-y}${SEP}#{@jot-title-icon}${SEP}#{@jot-title}${SEP}#{@jot-picker-title}${SEP}#{@jot-fzf-prompt}"
+    format="#{client_name}${SEP}#{session_name}${SEP}#{@jot-hidden-session-prefix}${SEP}#{@jot-debug}${SEP}#{@jot-log-file}${SEP}#{@jot-dir}${SEP}#{@jot-extension}${SEP}#{@jot-session-dir}${SEP}#{@jot-editor}${SEP}#{@jot-shell}${SEP}#{@jot-fzf-command}${SEP}#{@jot-fzf-options}${SEP}#{@jot-border-color}${SEP}#{@jot-border-style}${SEP}#{@jot-popup-width}${SEP}#{@jot-popup-height}${SEP}#{@jot-popup-x}${SEP}#{@jot-popup-y}${SEP}#{@jot-title-icon}${SEP}#{@jot-title}${SEP}#{@jot-fzf-prompt}"
     out="$(tmux display-message -p "$format" 2>/dev/null || true)"
 
     IFS="$SEP" read -r \
@@ -92,8 +92,7 @@ load_context_and_config() {
         CFG_JOT_DIR CFG_EXT CFG_SESSION_DIR CFG_EDITOR CFG_SHELL \
         CFG_FZF_COMMAND CFG_FZF_OPTIONS CFG_BORDER_COLOR CFG_BORDER_STYLE \
         CFG_POPUP_WIDTH CFG_POPUP_HEIGHT CFG_POPUP_X CFG_POPUP_Y \
-        CFG_PICKER_WIDTH CFG_PICKER_HEIGHT CFG_PICKER_X CFG_PICKER_Y \
-        CFG_ICON CFG_TITLE CFG_PICKER_TITLE CFG_FZF_PROMPT <<<"$out"
+        CFG_ICON CFG_TITLE CFG_FZF_PROMPT <<<"$out"
 
     CURRENT_CLIENT="${RAW_SOURCE_CLIENT:-$TMUX_CLIENT}"
     CURRENT_SESSION="${RAW_SESSION_NAME:-$TMUX_SESSION}"
@@ -127,7 +126,6 @@ load_context_and_config() {
     else
         TITLE_TEMPLATE=' {icon} {note} '
     fi
-    PICKER_TITLE_TEMPLATE="${CFG_PICKER_TITLE:- tmux-jot }"
     if [ -n "$CFG_FZF_PROMPT" ]; then
         FZF_PROMPT_TEMPLATE="$CFG_FZF_PROMPT"
     else
@@ -136,15 +134,6 @@ load_context_and_config() {
 
     if [ "$POS_X" = "R" ] || [ "$POS_X" = "r" ]; then
         POS_X="100%"
-    fi
-
-    PICKER_WIDTH="${CFG_PICKER_WIDTH:-$WIDTH}"
-    PICKER_HEIGHT="${CFG_PICKER_HEIGHT:-$HEIGHT}"
-    PICKER_X="${CFG_PICKER_X:-$POS_X}"
-    PICKER_Y="${CFG_PICKER_Y:-$POS_Y}"
-
-    if [ "$PICKER_X" = "R" ] || [ "$PICKER_X" = "r" ]; then
-        PICKER_X="100%"
     fi
 }
 
@@ -546,10 +535,6 @@ display_popup() {
     return 0
 }
 
-picker_title() {
-    tmux_title "$(render_template "$PICKER_TITLE_TEMPLATE")"
-}
-
 editor_title() {
     tmux_title "$(render_template "$TITLE_TEMPLATE")"
 }
@@ -566,7 +551,7 @@ display_picker_popup() {
     local command
 
     command="$(shell_join "$SCRIPT_PATH" popup_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
-    display_popup "$SOURCE_CLIENT" "$PICKER_WIDTH" "$PICKER_HEIGHT" "$PICKER_X" "$PICKER_Y" "$(picker_title)" "$command"
+    display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$command"
 }
 
 display_editor_popup() {
