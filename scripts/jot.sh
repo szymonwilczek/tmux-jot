@@ -126,9 +126,17 @@ load_context_and_config() {
     PICKER_Y="${CFG_PICKER_Y:-C}"
 
     ICON="${CFG_ICON:-📝}"
-    TITLE_TEMPLATE="${CFG_TITLE:- {icon} {note} }"
+    if [ -n "$CFG_TITLE" ]; then
+        TITLE_TEMPLATE="$CFG_TITLE"
+    else
+        TITLE_TEMPLATE=' {icon} {note} '
+    fi
     PICKER_TITLE_TEMPLATE="${CFG_PICKER_TITLE:- tmux-jot }"
-    FZF_PROMPT_TEMPLATE="${CFG_FZF_PROMPT:-{icon} Wybierz / Utwórz: }"
+    if [ -n "$CFG_FZF_PROMPT" ]; then
+        FZF_PROMPT_TEMPLATE="$CFG_FZF_PROMPT"
+    else
+        FZF_PROMPT_TEMPLATE='{icon} Wybierz / Utwórz: '
+    fi
 
     if [ "$POS_X" = "R" ] || [ "$POS_X" = "r" ]; then
         POS_X="100%"
