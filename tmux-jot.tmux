@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CURRENT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-get_tmux_option() {
+jot_get_tmux_option() {
     local option="$1"
     local default_value="$2"
     local option_value
@@ -15,16 +15,16 @@ get_tmux_option() {
     fi
 }
 
-shell_quote() {
+jot_shell_quote() {
     printf '%q' "$1"
 }
 
-KEY=$(get_tmux_option "@jot-key-bind" "j")
-USE_PREFIX=$(get_tmux_option "@jot-use-prefix" "false")
+KEY=$(jot_get_tmux_option "@jot-key-bind" "j")
+USE_PREFIX=$(jot_get_tmux_option "@jot-use-prefix" "false")
 SCRIPT_PATH="$CURRENT_DIR/scripts/jot.sh"
-SCRIPT_PATH_Q="$(shell_quote "$SCRIPT_PATH")"
+SCRIPT_PATH_Q="$(jot_shell_quote "$SCRIPT_PATH")"
 
-bind_jot_key() {
+jot_bind_key() {
     local key="$1"
     local use_prefix="$2"
     local mode="$3"
@@ -42,17 +42,17 @@ bind_jot_key() {
     fi
 }
 
-SWITCH_KEY=$(get_tmux_option "@jot-switch-key-bind" "")
-SWITCH_USE_PREFIX=$(get_tmux_option "@jot-switch-use-prefix" "false")
-CONTENT_SEARCH_KEY=$(get_tmux_option "@jot-content-search-key-bind" "M-w")
-CONTENT_SEARCH_USE_PREFIX=$(get_tmux_option "@jot-content-search-use-prefix" "true")
-DOCTOR_KEY=$(get_tmux_option "@jot-doctor-key-bind" "M-i")
-DOCTOR_USE_PREFIX=$(get_tmux_option "@jot-doctor-use-prefix" "true")
-CLEANUP_KEY=$(get_tmux_option "@jot-cleanup-key-bind" "M-k")
-CLEANUP_USE_PREFIX=$(get_tmux_option "@jot-cleanup-use-prefix" "true")
+SWITCH_KEY=$(jot_get_tmux_option "@jot-switch-key-bind" "")
+SWITCH_USE_PREFIX=$(jot_get_tmux_option "@jot-switch-use-prefix" "false")
+CONTENT_SEARCH_KEY=$(jot_get_tmux_option "@jot-content-search-key-bind" "M-w")
+CONTENT_SEARCH_USE_PREFIX=$(jot_get_tmux_option "@jot-content-search-use-prefix" "true")
+DOCTOR_KEY=$(jot_get_tmux_option "@jot-doctor-key-bind" "M-i")
+DOCTOR_USE_PREFIX=$(jot_get_tmux_option "@jot-doctor-use-prefix" "true")
+CLEANUP_KEY=$(jot_get_tmux_option "@jot-cleanup-key-bind" "M-k")
+CLEANUP_USE_PREFIX=$(jot_get_tmux_option "@jot-cleanup-use-prefix" "true")
 
-bind_jot_key "$KEY" "$USE_PREFIX" "main"
-bind_jot_key "$SWITCH_KEY" "$SWITCH_USE_PREFIX" "switch"
-bind_jot_key "$CONTENT_SEARCH_KEY" "$CONTENT_SEARCH_USE_PREFIX" "content_search"
-bind_jot_key "$DOCTOR_KEY" "$DOCTOR_USE_PREFIX" "doctor"
-bind_jot_key "$CLEANUP_KEY" "$CLEANUP_USE_PREFIX" "cleanup"
+jot_bind_key "$KEY" "$USE_PREFIX" "main"
+jot_bind_key "$SWITCH_KEY" "$SWITCH_USE_PREFIX" "switch"
+jot_bind_key "$CONTENT_SEARCH_KEY" "$CONTENT_SEARCH_USE_PREFIX" "content_search"
+jot_bind_key "$DOCTOR_KEY" "$DOCTOR_USE_PREFIX" "doctor"
+jot_bind_key "$CLEANUP_KEY" "$CLEANUP_USE_PREFIX" "cleanup"
