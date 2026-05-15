@@ -78,8 +78,6 @@ SWITCH_BIND=$(jot_get_tmux_option "@jot-switch-key-bind" "M-j")
 CONTENT_SEARCH_BIND=$(jot_get_tmux_option "@jot-content-search-key-bind" "M-w")
 DOCTOR_BIND=$(jot_get_tmux_option "@jot-doctor-key-bind" "M-i")
 CLEANUP_BIND=$(jot_get_tmux_option "@jot-cleanup-key-bind" "M-k")
-# "=" instead of "+" so increasing does not require Shift in the resize sequence
-# TODO: this should be still done with PLUS (or something else i come up with, it does not work smoothly as i want to)
 RESIZE_INCREASE_BIND=$(jot_get_tmux_option "@jot-resize-increase-key-bind" "-r M-=")
 RESIZE_INCREASE_SHIFT_BIND=$(jot_get_tmux_option "@jot-resize-increase-shift-key-bind" "-r M-+")
 RESIZE_INCREASE_REPEAT_BIND=$(jot_get_tmux_option "@jot-resize-increase-repeat-key-bind" "")
