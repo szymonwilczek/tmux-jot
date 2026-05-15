@@ -41,7 +41,7 @@ load_context_and_config() {
     HEIGHT="${CFG_POPUP_HEIGHT:-50%}"
     POPUP_WIDTH_BASE="$WIDTH"
     POPUP_HEIGHT_BASE="$HEIGHT"
-    POS_X="${CFG_POPUP_X:-100%}"
+    POS_X="${CFG_POPUP_X:-R}"
     POS_Y="${CFG_POPUP_Y:-0}"
 
     ICON="${CFG_ICON:-📝}"
@@ -61,7 +61,7 @@ load_context_and_config() {
         CONTENT_SEARCH_PROMPT_TEMPLATE='{icon} Szukaj w treści: '
     fi
 
-    if [ "$POS_X" = "R" ] || [ "$POS_X" = "r" ]; then
-        POS_X="100%"
+    if [ "$POS_X" = "r" ]; then
+        POS_X="R"
     fi
 }
