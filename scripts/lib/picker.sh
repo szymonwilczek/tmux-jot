@@ -41,8 +41,8 @@ select_note() {
     fzf_out="$(list_notes | run_fzf)"
     fzf_status=$?
 
-    if [ "$fzf_status" -ne 0 ] || [ -z "$fzf_out" ]; then
-        debug_log "picker cancelled: status=$fzf_status session=$SESSION_NAME"
+    if [ -z "$fzf_out" ]; then
+        debug_log "picker cancelled: empty output status=$fzf_status session=$SESSION_NAME"
         exit 0
     fi
 
@@ -56,6 +56,17 @@ select_note() {
             ;;
         esac
     done <<<"$fzf_out"
+
+    # fzf returns status 1 when there is no match, but with --print-query we can still
+    # get a valid query to create a new note from.
+    if [ "$fzf_status" -ne 0 ] && [ "$fzf_status" -ne 1 ]; then
+        debug_log "picker cancelled: unsupported status=$fzf_status session=$SESSION_NAME"
+        exit 0
+    fi
+    if [ -z "$selection" ] && [ -z "$query" ]; then
+        debug_log "picker cancelled: no selection and empty query status=$fzf_status session=$SESSION_NAME"
+        exit 0
+    fi
 
     if [ -n "$selection" ]; then
         target_note="$selection"
