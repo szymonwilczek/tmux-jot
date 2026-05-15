@@ -110,8 +110,9 @@ display_popup() {
 
 render_template() {
     local template="$1"
+    local icon="${2:-$TITLE_ICON}"
 
-    template="${template//\{icon\}/$ICON}"
+    template="${template//\{icon\}/$icon}"
     template="${template//\{session\}/$SESSION_NAME}"
     template="${template//\{note\}/${NOTE_NAME:-$SESSION_NAME}}"
     template="${template//\{file\}/$FILE_PATH}"
@@ -119,15 +120,15 @@ render_template() {
 }
 
 editor_title() {
-    tmux_title "$(render_template "$TITLE_TEMPLATE")"
+    tmux_title "$(render_template "$TITLE_TEMPLATE" "$TITLE_ICON")"
 }
 
 fzf_prompt() {
-    render_template "$FZF_PROMPT_TEMPLATE"
+    render_template "$FZF_PROMPT_TEMPLATE" "$PICKER_ICON"
 }
 
 content_search_prompt() {
-    render_template "$CONTENT_SEARCH_PROMPT_TEMPLATE"
+    render_template "$CONTENT_SEARCH_PROMPT_TEMPLATE" "$CONTENT_SEARCH_ICON"
 }
 
 display_picker_popup() {
