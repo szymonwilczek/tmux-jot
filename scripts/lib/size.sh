@@ -2,6 +2,57 @@ popup_size_delta_option() {
     printf '%s' "@jot-size-delta"
 }
 
+resize_repeat_state_option() {
+    printf '%s' "@jot_resize_repeat_$SAFE_CLIENT"
+}
+
+resize_repeat_timeout_seconds() {
+    local value
+
+    value="$(tmux show-option -gqv "@jot-resize-repeat-time" 2>/dev/null || true)"
+    value="$(normalize_unsigned_integer "${value:-2}" 2>/dev/null)" || value=2
+    [ "$value" -gt 0 ] || value=2
+    printf '%s' "$value"
+}
+
+resize_repeat_now() {
+    date +%s
+}
+
+enable_resize_repeat() {
+    local expires_at
+
+    expires_at=$(( $(resize_repeat_now) + $(resize_repeat_timeout_seconds) ))
+    tmux set-option -gq "$(resize_repeat_state_option)" "$expires_at" 2>/dev/null || true
+}
+
+resize_repeat_is_active() {
+    local expires_at
+    local now
+
+    expires_at="$(tmux show-option -gqv "$(resize_repeat_state_option)" 2>/dev/null || true)"
+    expires_at="$(normalize_unsigned_integer "$expires_at" 2>/dev/null)" || return 1
+    now="$(resize_repeat_now)"
+
+    [ "$expires_at" -ge "$now" ] || {
+        tmux set-option -guq "$(resize_repeat_state_option)" 2>/dev/null || true
+        return 1
+    }
+
+    jot_popup_is_open
+}
+
+send_literal_key() {
+    local key="$1"
+    local client="${CURRENT_CLIENT:-}"
+
+    if [ -n "$client" ]; then
+        tmux send-keys -c "$client" "$key" 2>/dev/null || true
+    else
+        tmux send-keys "$key" 2>/dev/null || true
+    fi
+}
+
 normalize_integer() {
     local value="$1"
     local sign=1
@@ -203,12 +254,24 @@ resize_popup() {
     fi
 
     set_session_popup_size_delta "$next_delta"
+    enable_resize_repeat
     apply_session_popup_size
 
     debug_log "popup resize: session=$SESSION_NAME direction=$direction delta=$POPUP_SIZE_DELTA size=$WIDTH x $HEIGHT"
     message_client "popup size: $WIDTH x $HEIGHT"
 
     reload_active_popup
+}
+
+resize_popup_repeat_or_send_key() {
+    local direction="$1"
+    local key="$2"
+
+    if resize_repeat_is_active; then
+        resize_popup "$direction"
+    else
+        send_literal_key "$key"
+    fi
 }
 
 reset_popup_size() {

@@ -121,6 +121,14 @@ resize_decrease)
     resize_popup "decrease"
     ;;
 
+resize_repeat_increase)
+    resize_popup_repeat_or_send_key "increase" "${4:-=}"
+    ;;
+
+resize_repeat_decrease)
+    resize_popup_repeat_or_send_key "decrease" "${4:--}"
+    ;;
+
 resize_reset)
     reset_popup_size
     ;;
