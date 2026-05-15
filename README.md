@@ -2,6 +2,12 @@
 
 `tmux-jot` is a tmux popup note manager (sticky notes). It keeps notes on disk, links one active note to each tmux session, and opens notes in a hidden tmux session so the editor state survives popup close/open cycles.
 
+<p align="center">
+  <a href="assets/showcase.mp4">
+    <img src="assets/showcase.gif" alt="tmux-jot showcase" width="900">
+  </a>
+</p>
+
 ## Requirements
 
 - tmux with `display-popup` support
