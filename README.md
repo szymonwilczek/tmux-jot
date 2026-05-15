@@ -209,3 +209,7 @@ The plugin stores runtime state in tmux options. These are not intended as user 
 | `@jot_resize_repeat_*` | Resize repeat timeout per client. |
 | `@jot-source-client` | Hidden session source client. |
 | `@jot-origin-session` | Hidden session origin session. |
+
+## License
+
+tmux-jot is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
