@@ -1,0 +1,83 @@
+name: Bug report
+description: Report reproducible incorrect behavior in tmux-jot.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for reproducible bugs. Questions and configuration help belong in Discussions.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+      placeholder: "The popup closes after selecting a new note instead of opening the editor."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the shortest sequence that reproduces the issue.
+      placeholder: |
+        1. Configure ...
+        2. Press ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happens now?
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: tmux-jot configuration
+      description: Include relevant `@jot-*` options from `.tmux.conf`.
+      render: tmux
+      placeholder: |
+        set -g @jot-dir "~/.local/share/tmux-jot"
+        set -g @jot-editor "nvim"
+    validations:
+      required: true
+  - type: input
+    id: tmux-version
+    attributes:
+      label: tmux version
+      placeholder: "tmux 3.6a"
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and platform
+      placeholder: "Alacritty on Linux, iTerm2 on macOS, WSL, etc."
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor output
+      description: If possible, paste output from `prefix + M-i`.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: If relevant, enable `@jot-debug on` and paste the log excerpt.
+      render: text
+    validations:
+      required: false

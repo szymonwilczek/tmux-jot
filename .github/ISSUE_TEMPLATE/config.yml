@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and usage help
+    url: https://github.com/szymonwilczek/tmux-jot/discussions/categories/q-a
+    about: Use Discussions for setup questions, terminal-specific behavior, and usage help.
+  - name: Ideas and design proposals
+    url: https://github.com/szymonwilczek/tmux-jot/discussions/categories/ideas
+    about: Use Discussions for early design notes before opening an implementation issue.

@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a scoped change to tmux-jot.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for concrete feature requests. Open-ended ideas are better suited for Discussions first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What limitation or workflow gap should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the expected behavior and user-facing interface.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration surface
+      description: List any new `@jot-*` options, bindings, defaults, or compatibility concerns.
+      placeholder: |
+        New option:
+        - @jot-example-option: default value and behavior
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Briefly describe other approaches and why they are weaker.
+    validations:
+      required: false
+  - type: textarea
+    id: risks
+    attributes:
+      label: Compatibility and risk
+      description: Note any likely breakage for existing configs, terminals, tmux versions, or workflows.
+    validations:
+      required: false
