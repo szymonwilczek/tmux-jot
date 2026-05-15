@@ -61,12 +61,12 @@ load_context_and_config() {
     if [ -n "$CFG_FZF_PROMPT" ]; then
         FZF_PROMPT_TEMPLATE="$CFG_FZF_PROMPT"
     else
-        FZF_PROMPT_TEMPLATE='{icon} Wybierz / Utwórz: '
+        FZF_PROMPT_TEMPLATE='{icon} Select / Create: '
     fi
     if [ -n "$CFG_CONTENT_SEARCH_PROMPT" ]; then
         CONTENT_SEARCH_PROMPT_TEMPLATE="$CFG_CONTENT_SEARCH_PROMPT"
     else
-        CONTENT_SEARCH_PROMPT_TEMPLATE='{icon} Szukaj w treści: '
+        CONTENT_SEARCH_PROMPT_TEMPLATE='{icon} Search content: '
     fi
 
     if [ "$POS_X" = "r" ]; then
