@@ -1,3 +1,75 @@
+popup_dimension_cells() {
+    local dimension="$1"
+    local total="$2"
+    local number
+    local cells
+
+    case "$dimension" in
+    *%)
+        number="${dimension%\%}"
+        number="$(normalize_unsigned_integer "$number" 2>/dev/null)" || number=50
+        cells=$((total * number / 100))
+        ;;
+    "" | *[!0-9]*)
+        cells=$((total / 2))
+        ;;
+    *)
+        cells="$(normalize_unsigned_integer "$dimension" 2>/dev/null)" || cells=$((total / 2))
+        ;;
+    esac
+
+    clamp_number "$cells" 1 "$total"
+}
+
+popup_anchor_position() {
+    local position="$1"
+    local dimension="$2"
+    local total="$3"
+    local available
+    local number
+
+    available=$((total - dimension))
+    [ "$available" -ge 0 ] || available=0
+
+    case "$position" in
+    R)
+        printf '%s' "$available"
+        ;;
+    C)
+        printf '%s' "$((available / 2))"
+        ;;
+    *%)
+        number="${position%\%}"
+        number="$(normalize_unsigned_integer "$number" 2>/dev/null)" || number=0
+        printf '%s' "$((available * number / 100))"
+        ;;
+    "" | *[!0-9]*)
+        printf '%s' "$position"
+        ;;
+    *)
+        printf '%s' "$position"
+        ;;
+    esac
+}
+
+popup_resolved_x() {
+    local client_width
+    local popup_width
+
+    client_width="$(popup_client_width)"
+    popup_width="$(popup_dimension_cells "$WIDTH" "$client_width")"
+    popup_anchor_position "$POS_X" "$popup_width" "$client_width"
+}
+
+popup_resolved_y() {
+    local client_height
+    local popup_height
+
+    client_height="$(popup_client_height)"
+    popup_height="$(popup_dimension_cells "$HEIGHT" "$client_height")"
+    popup_anchor_position "$POS_Y" "$popup_height" "$client_height"
+}
+
 display_popup() {
     local client="$1"
     local width="$2"
@@ -8,6 +80,13 @@ display_popup() {
     local command="$7"
     local popup_status
     local popup_args=(display-popup)
+
+    POS_X="$pos_x"
+    POS_Y="$pos_y"
+    WIDTH="$width"
+    HEIGHT="$height"
+    pos_x="$(popup_resolved_x)"
+    pos_y="$(popup_resolved_y)"
 
     [ -z "$client" ] || popup_args+=(-c "$client")
     popup_args+=(
@@ -79,12 +158,22 @@ display_cleanup_popup() {
     display_popup "$SOURCE_CLIENT" "$WIDTH" "$HEIGHT" "$POS_X" "$POS_Y" "$(editor_title)" "$command"
 }
 
+replace_popup_command() {
+    local command="$1"
+
+    if [ -n "$SOURCE_CLIENT" ]; then
+        tmux display-popup -c "$SOURCE_CLIENT" -C \; run-shell -b "$command"
+    else
+        tmux display-popup -C \; run-shell -b "$command"
+    fi
+}
+
 schedule_picker_popup() {
     local command
 
     command="$(shell_join "$SCRIPT_PATH" open_picker "$SOURCE_CLIENT" "$SESSION_NAME")"
     debug_log "Scheduling async picker open: $command"
-    tmux run-shell -b "$command"
+    replace_popup_command "$command"
 }
 
 schedule_content_search_popup() {
@@ -92,7 +181,7 @@ schedule_content_search_popup() {
 
     command="$(shell_join "$SCRIPT_PATH" open_content_search "$SOURCE_CLIENT" "$SESSION_NAME")"
     debug_log "Scheduling async content search open: $command"
-    tmux run-shell -b "$command"
+    replace_popup_command "$command"
 }
 
 schedule_doctor_popup() {
@@ -100,7 +189,7 @@ schedule_doctor_popup() {
 
     command="$(shell_join "$SCRIPT_PATH" open_doctor "$SOURCE_CLIENT" "$SESSION_NAME")"
     debug_log "Scheduling async doctor open: $command"
-    tmux run-shell -b "$command"
+    replace_popup_command "$command"
 }
 
 schedule_cleanup_popup() {
@@ -108,7 +197,7 @@ schedule_cleanup_popup() {
 
     command="$(shell_join "$SCRIPT_PATH" open_cleanup "$SOURCE_CLIENT" "$SESSION_NAME")"
     debug_log "Scheduling async cleanup open: $command"
-    tmux run-shell -b "$command"
+    replace_popup_command "$command"
 }
 
 schedule_editor_popup() {
@@ -118,7 +207,7 @@ schedule_editor_popup() {
 
     command="$(shell_join "$SCRIPT_PATH" open_editor "$SOURCE_CLIENT" "$SESSION_NAME" "$file" "$note")"
     debug_log "Scheduling async editor open: $command"
-    tmux run-shell -b "$command"
+    replace_popup_command "$command"
 }
 
 wait_for_key() {
