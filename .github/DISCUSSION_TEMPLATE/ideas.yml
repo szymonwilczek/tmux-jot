@@ -1,0 +1,28 @@
+title: "[Idea] "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this category for early design proposals. If the behavior is already well-defined and actionable, open a feature request instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What workflow would this improve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed direction
+      description: Describe the idea at the behavior/API level.
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Tradeoffs
+      description: Note expected complexity, compatibility issues, or alternatives.
+    validations:
+      required: false

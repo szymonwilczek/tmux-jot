@@ -1,0 +1,30 @@
+title: "[General] "
+labels: ["discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this category for tmux-jot usage notes, integration reports, and technical discussion that is not yet a bug report or feature request.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to do with tmux-jot?
+      placeholder: "I use tmux-jot with ... and want to discuss ..."
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Include relevant configuration, terminal details, tmux version, or workflow constraints.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What would make this discussion resolved?
+    validations:
+      required: false

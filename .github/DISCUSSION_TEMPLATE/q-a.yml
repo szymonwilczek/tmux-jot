@@ -1,0 +1,36 @@
+title: "[Q&A] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this category for setup questions, configuration questions, and terminal-specific behavior.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: State the question directly.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant configuration
+      description: Paste relevant `@jot-*` options and bindings.
+      render: tmux
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "tmux version, terminal, OS"
+    validations:
+      required: false
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: List commands, bindings, or configuration changes already tested.
+    validations:
+      required: false
